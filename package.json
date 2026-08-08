@@ -1,1 +1,12 @@
-
+{
+  "name": "ai-social-agent",
+  "version": "1.0.0",
+  "description": "AI social media automation agent",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
