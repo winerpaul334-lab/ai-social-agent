@@ -1,20 +1,25 @@
 const express = require("express");
 const path = require("path");
+const { GoogleGenAI } = require("@google/genai");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-
-// Serve the website
 app.use(express.static(path.join(__dirname)));
 
+// Gemini AI
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
+
+// Website
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Receive AI commands
-app.post("/command", (req, res) => {
+// AI command
+app.post("/command", async (req, res) => {
   const { command } = req.body;
 
   if (!command) {
@@ -23,12 +28,26 @@ app.post("/command", (req, res) => {
     });
   }
 
-  res.json({
-    success: true,
-    command: command,
-    message: "Command received successfully.",
-    nextStep: "AI processing will be connected here."
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: command
+    });
+
+    res.json({
+      success: true,
+      command: command,
+      response: response.text
+    });
+
+  } catch (error) {
+    console.error("Gemini error:", error);
+
+    res.status(500).json({
+      success: false,
+      error: "AI could not process the command."
+    });
+  }
 });
 
 app.listen(PORT, () => {
