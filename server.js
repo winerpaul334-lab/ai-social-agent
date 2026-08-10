@@ -1,19 +1,19 @@
 const express = require("express");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Home page
+// Serve the website
+app.use(express.static(path.join(__dirname)));
+
 app.get("/", (req, res) => {
-  res.json({
-    status: "online",
-    message: "AI Social Agent is running 🚀"
-  });
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// AI command system
+// Receive AI commands
 app.post("/command", (req, res) => {
   const { command } = req.body;
 
