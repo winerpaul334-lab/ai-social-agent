@@ -9,29 +9,39 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Gemini
+// ================================
+// GEMINI
+// ================================
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
 
-// Supabase
+// ================================
+// SUPABASE
+// ================================
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-// Website
+// ================================
+// WEBSITE
+// ================================
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Save a memory
+// ================================
+// MEMORY
+// ================================
+
 async function saveMemory(memory) {
   const { error } = await supabase
     .from("agent_memory")
-    .insert({
-      memory: memory
-    });
+    .insert({ memory });
 
   if (error) {
     console.error("Memory save error:", error);
@@ -41,7 +51,6 @@ async function saveMemory(memory) {
   return true;
 }
 
-// Get previous memories
 async function getMemories() {
   const { data, error } = await supabase
     .from("agent_memory")
@@ -57,7 +66,10 @@ async function getMemories() {
   return data || [];
 }
 
-// Save generated post
+// ================================
+// POSTS
+// ================================
+
 async function savePost(command, post, hashtags, imageIdea) {
   const { error } = await supabase
     .from("posts")
@@ -73,7 +85,6 @@ async function savePost(command, post, hashtags, imageIdea) {
   }
 }
 
-// Get previous posts
 async function getPreviousPosts() {
   const { data, error } = await supabase
     .from("posts")
@@ -89,7 +100,118 @@ async function getPreviousPosts() {
   return data || [];
 }
 
-// AI command
+// ================================
+// TAVILY WEB SEARCH
+// ================================
+
+async function webSearch(query) {
+  const apiKey = process.env.TAVILY_API_KEY;
+
+  if (!apiKey) {
+    console.error("TAVILY_API_KEY is missing.");
+    return {
+      success: false,
+      results: []
+    };
+  }
+
+  try {
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query: query,
+        search_depth: "advanced",
+        topic: "news",
+        max_results: 5,
+        include_answer: true,
+        include_raw_content: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error(
+        "Tavily error:",
+        response.status,
+        errorText
+      );
+
+      return {
+        success: false,
+        results: []
+      };
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      answer: data.answer || "",
+      results: data.results || []
+    };
+
+  } catch (error) {
+    console.error("Tavily request error:", error);
+
+    return {
+      success: false,
+      results: []
+    };
+  }
+}
+
+// ================================
+// SAVE RESEARCH
+// ================================
+
+async function saveResearch(query, results) {
+  const { error } = await supabase
+    .from("research")
+    .insert({
+      query,
+      results: JSON.stringify(results)
+    });
+
+  if (error) {
+    console.error("Research save error:", error);
+  }
+}
+
+// ================================
+// DETECT WEB RESEARCH REQUEST
+// ================================
+
+function needsWebResearch(command) {
+  const words = [
+    "latest",
+    "current",
+    "today",
+    "news",
+    "recent",
+    "research",
+    "search the web",
+    "search online",
+    "find out",
+    "what is happening",
+    "trending",
+    "this week",
+    "this month"
+  ];
+
+  const text = command.toLowerCase();
+
+  return words.some(word => text.includes(word));
+}
+
+// ================================
+// AI COMMAND
+// ================================
+
 app.post("/command", async (req, res) => {
   const { command } = req.body;
 
@@ -101,11 +223,13 @@ app.post("/command", async (req, res) => {
   }
 
   try {
+
     const lowerCommand = command.toLowerCase();
 
-    // --------------------------------
+    // ================================
     // REMEMBER COMMAND
-    // --------------------------------
+    // ================================
+
     const rememberWords = [
       "remember that",
       "remember this",
@@ -117,10 +241,13 @@ app.post("/command", async (req, res) => {
     );
 
     if (isRememberCommand) {
+
       let memory = command;
 
       for (const word of rememberWords) {
-        memory = memory.replace(new RegExp(word, "i"), "").trim();
+        memory = memory
+          .replace(new RegExp(word, "i"), "")
+          .trim();
       }
 
       const saved = await saveMemory(memory);
@@ -140,9 +267,10 @@ app.post("/command", async (req, res) => {
       });
     }
 
-    // --------------------------------
-    // GET MEMORIES
-    // --------------------------------
+    // ================================
+    // MEMORY QUESTION
+    // ================================
+
     const memoryWords = [
       "what do you remember",
       "what you remember",
@@ -165,15 +293,18 @@ app.post("/command", async (req, res) => {
       });
     }
 
-    // --------------------------------
-    // GET PREVIOUS POSTS
-    // --------------------------------
+    // ================================
+    // PREVIOUS POSTS
+    // ================================
+
     const previousPosts = await getPreviousPosts();
 
     const memoryText =
       memories.length > 0
         ? memories
-            .map((item, index) => `${index + 1}. ${item.memory}`)
+            .map((item, index) =>
+              `${index + 1}. ${item.memory}`
+            )
             .join("\n")
         : "No saved memories yet.";
 
@@ -183,16 +314,61 @@ app.post("/command", async (req, res) => {
             .map((item, index) =>
               `${index + 1}. ${item.post}`
             )
-            .join("\n")
+            .join("\n\n")
         : "No previous posts yet.";
 
-    // --------------------------------
+    // ================================
+    // WEB RESEARCH
+    // ================================
+
+    let researchText = "No web research was requested.";
+    let researchSources = [];
+
+    const shouldSearch = needsWebResearch(command);
+
+    if (shouldSearch) {
+
+      console.log("Searching web with Tavily...");
+
+      const search = await webSearch(command);
+
+      if (search.success) {
+
+        researchSources = search.results;
+
+        researchText = `
+TAVILY ANSWER:
+${search.answer || "No direct answer returned."}
+
+SEARCH RESULTS:
+${search.results
+  .map((item, index) => `
+${index + 1}. ${item.title}
+URL: ${item.url}
+CONTENT:
+${item.content}
+`)
+  .join("\n")}
+`;
+
+        await saveResearch(
+          command,
+          search.results
+        );
+
+      } else {
+
+        researchText =
+          "Web research was requested, but Tavily could not return results.";
+      }
+    }
+
+    // ================================
     // AI PROMPT
-    // --------------------------------
+    // ================================
+
     const prompt = `
 You are the AI brain of a professional social media agent.
-
-You must understand normal typed commands and eventually voice commands.
 
 USER COMMAND:
 ${command}
@@ -203,29 +379,42 @@ ${memoryText}
 PREVIOUS POSTS:
 ${postHistoryText}
 
-IMPORTANT INSTRUCTIONS:
+WEB RESEARCH:
+${researchText}
 
-1. Actually use the USER MEMORY when it is relevant.
-2. Do not claim to remember something that is not in USER MEMORY.
+IMPORTANT RULES:
+
+1. Actually use the USER MEMORY when relevant.
+2. Never claim to remember something that is not in USER MEMORY.
 3. Avoid repeating previous posts.
-4. If the user asks for a social media post, create the actual post.
-5. If the user asks for hashtags, provide relevant hashtags.
-6. If the user asks for an image, provide a detailed IMAGE_IDEA.
-7. If the user asks for current/latest news, do not pretend you know live information. Live web research will be added separately.
+4. If web research is provided, use it for factual claims.
+5. Never invent current news.
+6. Do not pretend web research happened if no research results were provided.
+7. Create original, natural and engaging content.
 8. Follow the user's exact command.
-9. Keep content natural, professional and engaging.
+9. Keep posts professional unless the user requests another style.
+10. If the user asks for current news, prioritize the newest information in the research.
+11. Do not copy large portions of source articles.
+12. If sources are available, include a short SOURCES section with the URLs.
 
-Return the answer using exactly these sections when creating a post:
+When creating a social media post, return exactly:
 
 POST:
 [actual post]
 
 HASHTAGS:
-[hashtags]
+[relevant hashtags]
 
 IMAGE_IDEA:
-[image idea]
+[suitable image idea]
+
+SOURCES:
+[only if web research was used]
 `;
+
+    // ================================
+    // GEMINI
+    // ================================
 
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
@@ -234,9 +423,10 @@ IMAGE_IDEA:
 
     const result = response.text || "";
 
-    // --------------------------------
-    // EXTRACT POST INFORMATION
-    // --------------------------------
+    // ================================
+    // EXTRACT POST
+    // ================================
+
     let postText = result;
     let hashtags = "";
     let imageIdea = "";
@@ -246,7 +436,7 @@ IMAGE_IDEA:
     );
 
     const imageMatch = result.match(
-      /IMAGE_IDEA:\s*([\s\S]*)$/i
+      /IMAGE_IDEA:\s*([\s\S]*?)(?=\nSOURCES:|$)/i
     );
 
     const postMatch = result.match(
@@ -265,7 +455,10 @@ IMAGE_IDEA:
       imageIdea = imageMatch[1].trim();
     }
 
-    // Save the generated post
+    // ================================
+    // SAVE POST
+    // ================================
+
     await savePost(
       command,
       postText,
@@ -273,15 +466,22 @@ IMAGE_IDEA:
       imageIdea
     );
 
+    // ================================
+    // RESPONSE
+    // ================================
+
     res.json({
       success: true,
       command,
       response: result,
       memory_used: memories.length,
-      previous_posts_checked: previousPosts.length
+      previous_posts_checked: previousPosts.length,
+      web_research_used: shouldSearch,
+      research_sources: researchSources.length
     });
 
   } catch (error) {
+
     console.error("AI error:", error);
 
     res.status(500).json({
@@ -291,6 +491,12 @@ IMAGE_IDEA:
   }
 });
 
+// ================================
+// START SERVER
+// ================================
+
 app.listen(PORT, () => {
-  console.log(`AI Social Agent running on port ${PORT}`);
+  console.log(
+    `AI Social Agent running on port ${PORT}`
+  );
 });
