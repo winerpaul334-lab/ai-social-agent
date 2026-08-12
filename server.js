@@ -109,28 +109,33 @@ async function webSearch(query) {
 
   if (!apiKey) {
     console.error("TAVILY_API_KEY is missing.");
+
     return {
       success: false,
+      answer: "",
       results: []
     };
   }
 
   try {
-    const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: query,
-        search_depth: "advanced",
-        topic: "news",
-        max_results: 5,
-        include_answer: true,
-        include_raw_content: false
-      })
-    });
+    const response = await fetch(
+      "https://api.tavily.com/search",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          api_key: apiKey,
+          query,
+          search_depth: "advanced",
+          topic: "news",
+          max_results: 5,
+          include_answer: true,
+          include_raw_content: false
+        })
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -143,6 +148,7 @@ async function webSearch(query) {
 
       return {
         success: false,
+        answer: "",
         results: []
       };
     }
@@ -160,6 +166,7 @@ async function webSearch(query) {
 
     return {
       success: false,
+      answer: "",
       results: []
     };
   }
@@ -183,7 +190,7 @@ async function saveResearch(query, results) {
 }
 
 // ================================
-// DETECT WEB RESEARCH REQUEST
+// DETECT WEB RESEARCH
 // ================================
 
 function needsWebResearch(command) {
@@ -223,11 +230,10 @@ app.post("/command", async (req, res) => {
   }
 
   try {
-
     const lowerCommand = command.toLowerCase();
 
     // ================================
-    // REMEMBER COMMAND
+    // REMEMBER
     // ================================
 
     const rememberWords = [
@@ -241,7 +247,6 @@ app.post("/command", async (req, res) => {
     );
 
     if (isRememberCommand) {
-
       let memory = command;
 
       for (const word of rememberWords) {
@@ -268,7 +273,7 @@ app.post("/command", async (req, res) => {
     }
 
     // ================================
-    // MEMORY QUESTION
+    // GET MEMORIES
     // ================================
 
     const memoryWords = [
@@ -302,8 +307,9 @@ app.post("/command", async (req, res) => {
     const memoryText =
       memories.length > 0
         ? memories
-            .map((item, index) =>
-              `${index + 1}. ${item.memory}`
+            .map(
+              (item, index) =>
+                `${index + 1}. ${item.memory}`
             )
             .join("\n")
         : "No saved memories yet.";
@@ -311,8 +317,9 @@ app.post("/command", async (req, res) => {
     const postHistoryText =
       previousPosts.length > 0
         ? previousPosts
-            .map((item, index) =>
-              `${index + 1}. ${item.post}`
+            .map(
+              (item, index) =>
+                `${index + 1}. ${item.post}`
             )
             .join("\n\n")
         : "No previous posts yet.";
@@ -321,18 +328,19 @@ app.post("/command", async (req, res) => {
     // WEB RESEARCH
     // ================================
 
-    let researchText = "No web research was requested.";
+    let researchText =
+      "No web research was requested.";
+
     let researchSources = [];
 
     const shouldSearch = needsWebResearch(command);
 
     if (shouldSearch) {
-
       console.log("Searching web with Tavily...");
 
       const search = await webSearch(command);
 
-      if (search.success) {
+      if (search.success && search.results.length > 0) {
 
         researchSources = search.results;
 
@@ -342,12 +350,15 @@ ${search.answer || "No direct answer returned."}
 
 SEARCH RESULTS:
 ${search.results
-  .map((item, index) => `
-${index + 1}. ${item.title}
+  .map(
+    (item, index) => `
+SOURCE ${index + 1}
+TITLE: ${item.title}
 URL: ${item.url}
 CONTENT:
 ${item.content}
-`)
+`
+  )
   .join("\n")}
 `;
 
@@ -358,8 +369,12 @@ ${item.content}
 
       } else {
 
-        researchText =
-          "Web research was requested, but Tavily could not return results.";
+        researchText = `
+Web research was requested, but no usable Tavily
+results were returned.
+
+Do NOT invent current information.
+`;
       }
     }
 
@@ -382,25 +397,35 @@ ${postHistoryText}
 WEB RESEARCH:
 ${researchText}
 
-IMPORTANT RULES:
+RESEARCH RULES:
 
-1. Actually use the USER MEMORY when relevant.
-2. Never claim to remember something that is not in USER MEMORY.
-3. Avoid repeating previous posts.
-4. If web research is provided, use it for factual claims.
-5. Never invent current news.
-6. Do not pretend web research happened if no research results were provided.
-7. Create original, natural and engaging content.
-8. Follow the user's exact command.
-9. Keep posts professional unless the user requests another style.
-10. If the user asks for current news, prioritize the newest information in the research.
-11. Do not copy large portions of source articles.
-12. If sources are available, include a short SOURCES section with the URLs.
+1. Treat web research as evidence, not automatically as truth.
+2. Only make factual claims supported by the provided research.
+3. Prefer claims supported by multiple independent sources.
+4. If sources disagree, do not hide the disagreement.
+5. For current or latest news, prefer the newest reliable information.
+6. Never invent statistics, people, companies, events, dates or quotes.
+7. Never claim something happened today unless the research supports it.
+8. Do not use general knowledge to fill missing details about current events.
+9. Do not copy source articles.
+10. Rewrite information in original wording.
+11. Use the user's memory when relevant.
+12. Avoid repeating previous posts.
+13. Keep the writing professional, natural and engaging.
+14. Follow the user's exact command.
+15. If the research is insufficient, say so instead of guessing.
+
+SOURCE RULES:
+
+- If web research was used, include 2–3 of the strongest sources.
+- Use only URLs actually provided by Tavily.
+- Never invent URLs.
+- Do not cite a source for a claim it does not support.
 
 When creating a social media post, return exactly:
 
 POST:
-[actual post]
+[actual original post]
 
 HASHTAGS:
 [relevant hashtags]
@@ -409,7 +434,7 @@ IMAGE_IDEA:
 [suitable image idea]
 
 SOURCES:
-[only if web research was used]
+[2–3 relevant URLs if web research was used]
 `;
 
     // ================================
@@ -424,7 +449,7 @@ SOURCES:
     const result = response.text || "";
 
     // ================================
-    // EXTRACT POST
+    // EXTRACT CONTENT
     // ================================
 
     let postText = result;
@@ -481,7 +506,6 @@ SOURCES:
     });
 
   } catch (error) {
-
     console.error("AI error:", error);
 
     res.status(500).json({
