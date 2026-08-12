@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Gemini AI
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
@@ -29,14 +28,39 @@ app.post("/command", async (req, res) => {
   }
 
   try {
+    const prompt = `
+You are the AI brain of a professional social media agent.
+
+Understand the user's command and respond with these three sections:
+
+POST:
+Write the actual social media post.
+
+HASHTAGS:
+Give relevant hashtags. Do not use too many.
+
+IMAGE_IDEA:
+Describe a suitable image for the post.
+
+Important:
+- Follow the user's command.
+- Do not invent current news.
+- If the user asks for current/latest information, say that live web research is needed.
+- Make the post natural and engaging.
+- Avoid repeating the same wording unnecessarily.
+
+USER COMMAND:
+${command}
+`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
-      contents: command
+      contents: prompt
     });
 
     res.json({
       success: true,
-      command: command,
+      command,
       response: response.text
     });
 
