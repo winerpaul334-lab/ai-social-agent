@@ -9,17 +9,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// ==========================================
-// GEMINI
-// ==========================================
-
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
-
-// ==========================================
-// SUPABASE
-// ==========================================
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -28,10 +20,6 @@ const supabase = createClient(
 );
 
 const IMAGE_BUCKET = "generated-images";
-
-// ==========================================
-// WEBSITE
-// ==========================================
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
@@ -77,7 +65,8 @@ async function savePost(
   command,
   post,
   hashtags,
-  imageIdea
+  imageIdea,
+  imageUrl
 ) {
   const { error } = await supabase
     .from("posts")
@@ -85,7 +74,8 @@ async function savePost(
       command,
       post,
       hashtags,
-      image_idea: imageIdea
+      image_idea: imageIdea,
+      image_url: imageUrl
     });
 
   if (error) {
@@ -109,7 +99,7 @@ async function getPreviousPosts() {
 }
 
 // ==========================================
-// TAVILY WEB SEARCH
+// TAVILY
 // ==========================================
 
 async function webSearch(query) {
@@ -130,9 +120,11 @@ async function webSearch(query) {
       "https://api.tavily.com/search",
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
           api_key: apiKey,
           query,
@@ -147,12 +139,10 @@ async function webSearch(query) {
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-
       console.error(
         "Tavily error:",
         response.status,
-        errorText
+        await response.text()
       );
 
       return {
@@ -171,10 +161,7 @@ async function webSearch(query) {
     };
 
   } catch (error) {
-    console.error(
-      "Tavily request error:",
-      error
-    );
+    console.error("Tavily request error:", error);
 
     return {
       success: false,
@@ -185,7 +172,7 @@ async function webSearch(query) {
 }
 
 // ==========================================
-// SAVE RESEARCH
+// RESEARCH
 // ==========================================
 
 async function saveResearch(query, results) {
@@ -197,16 +184,9 @@ async function saveResearch(query, results) {
     });
 
   if (error) {
-    console.error(
-      "Research save error:",
-      error
-    );
+    console.error("Research save error:", error);
   }
 }
-
-// ==========================================
-// RESEARCH DETECTION
-// ==========================================
 
 function needsWebResearch(command) {
   const words = [
@@ -235,20 +215,14 @@ function needsWebResearch(command) {
   );
 }
 
-// ==========================================
-// CLEAN SEARCH RESULTS
-// ==========================================
-
 function cleanSearchResults(results) {
   return results
-    .filter(item => {
-      return (
-        item &&
-        item.title &&
-        item.url &&
-        item.content
-      );
-    })
+    .filter(item =>
+      item &&
+      item.title &&
+      item.url &&
+      item.content
+    )
     .map(item => ({
       title: item.title,
       url: item.url,
@@ -256,14 +230,7 @@ function cleanSearchResults(results) {
     }));
 }
 
-// ==========================================
-// RESEARCH TEXT
-// ==========================================
-
-function buildResearchText(
-  answer,
-  results
-) {
+function buildResearchText(answer, results) {
   if (!results.length) {
     return `
 No usable web research was returned.
@@ -308,42 +275,49 @@ async function generateImage(imageIdea) {
     "🎨 Starting real image generation..."
   );
 
-  if (!process.env.GEMINI_API_KEY) {
-    console.error(
-      "❌ GEMINI_API_KEY is missing."
-    );
-
-    return null;
-  }
-
   try {
-    const prompt = `
-Create a professional image for a social media post.
+    if (!process.env.GEMINI_API_KEY) {
+      console.error(
+        "❌ GEMINI_API_KEY is missing."
+      );
 
-Image concept:
+      return null;
+    }
+
+    const prompt = `
+Create a professional, photorealistic image
+for a social media post.
+
+IMAGE CONCEPT:
 ${imageIdea}
 
 Requirements:
+
+- Photorealistic
 - Professional
 - Modern
 - High quality
 - Clean composition
 - Visually engaging
 - Suitable for X/Twitter
-- Landscape 16:9 composition
+- Landscape composition
 - No watermark
 - No unnecessary text
+- Do not create a poster
+- Do not create a screenshot
+- Create an actual photographic/visual scene
 `;
+
+    console.log(
+      "🧠 Sending image request to Gemini..."
+    );
 
     const response =
       await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3.1-flash-image",
         contents: prompt,
         config: {
-          responseModalities: [
-            "TEXT",
-            "IMAGE"
-          ]
+          responseModalities: ["IMAGE"]
         }
       });
 
@@ -363,8 +337,20 @@ Requirements:
         "❌ Gemini did not return an image."
       );
 
+      console.error(
+        JSON.stringify(
+          response,
+          null,
+          2
+        )
+      );
+
       return null;
     }
+
+    console.log(
+      "✅ Gemini returned an image."
+    );
 
     const imageBuffer =
       Buffer.from(
@@ -401,6 +387,10 @@ Requirements:
       return null;
     }
 
+    console.log(
+      "✅ Image uploaded to Supabase."
+    );
+
     const { data } =
       supabase.storage
         .from(IMAGE_BUCKET)
@@ -415,7 +405,7 @@ Requirements:
     }
 
     console.log(
-      "✅ REAL IMAGE GENERATED:"
+      "🖼️ IMAGE URL:"
     );
 
     console.log(data.publicUrl);
@@ -606,7 +596,7 @@ Do not pretend research was successful.
     }
 
     // ======================================
-    // GEMINI POST PROMPT
+    // GEMINI POST
     // ======================================
 
     const prompt = `
@@ -640,7 +630,7 @@ RULES:
 11. Keep content professional.
 12. Make it engaging.
 13. Follow the user's command exactly.
-14. Create a useful IMAGE_IDEA for every
+14. Create a detailed IMAGE_IDEA for every
 social media post.
 
 When creating a social media post,
@@ -669,7 +659,7 @@ SOURCES:
       response.text || "";
 
     // ======================================
-    // EXTRACT POST
+    // EXTRACT RESULT
     // ======================================
 
     let postText = result;
@@ -707,7 +697,7 @@ SOURCES:
     }
 
     // ======================================
-    // GENERATE REAL IMAGE
+    // REAL IMAGE
     // ======================================
 
     let imageUrl = null;
@@ -727,11 +717,12 @@ SOURCES:
       command,
       postText,
       hashtags,
-      imageIdea
+      imageIdea,
+      imageUrl
     );
 
     // ======================================
-    // RETURN RESULT
+    // RESPONSE
     // ======================================
 
     return res.json({
