@@ -23,7 +23,8 @@ const ai = new GoogleGenAI({
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_KEY
 );
 
 const IMAGE_BUCKET = "generated-images";
@@ -43,9 +44,7 @@ app.get("/", (req, res) => {
 async function saveMemory(memory) {
   const { error } = await supabase
     .from("agent_memory")
-    .insert({
-      memory
-    });
+    .insert({ memory });
 
   if (error) {
     console.error("Memory save error:", error);
@@ -59,9 +58,7 @@ async function getMemories() {
   const { data, error } = await supabase
     .from("agent_memory")
     .select("memory, created_at")
-    .order("created_at", {
-      ascending: false
-    })
+    .order("created_at", { ascending: false })
     .limit(20);
 
   if (error) {
@@ -80,8 +77,7 @@ async function savePost(
   command,
   post,
   hashtags,
-  imageIdea,
-  imageUrl
+  imageIdea
 ) {
   const { error } = await supabase
     .from("posts")
@@ -89,8 +85,7 @@ async function savePost(
       command,
       post,
       hashtags,
-      image_idea: imageIdea,
-      image_url: imageUrl
+      image_idea: imageIdea
     });
 
   if (error) {
@@ -101,20 +96,12 @@ async function savePost(
 async function getPreviousPosts() {
   const { data, error } = await supabase
     .from("posts")
-    .select(
-      "post, hashtags, created_at"
-    )
-    .order("created_at", {
-      ascending: false
-    })
+    .select("post, hashtags, created_at")
+    .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) {
-    console.error(
-      "Post history error:",
-      error
-    );
-
+    console.error("Post history error:", error);
     return [];
   }
 
@@ -122,17 +109,14 @@ async function getPreviousPosts() {
 }
 
 // ==========================================
-// TAVILY SEARCH
+// TAVILY WEB SEARCH
 // ==========================================
 
 async function webSearch(query) {
-  const apiKey =
-    process.env.TAVILY_API_KEY;
+  const apiKey = process.env.TAVILY_API_KEY;
 
   if (!apiKey) {
-    console.error(
-      "TAVILY_API_KEY is missing."
-    );
+    console.error("TAVILY_API_KEY is missing.");
 
     return {
       success: false,
@@ -146,12 +130,9 @@ async function webSearch(query) {
       "https://api.tavily.com/search",
       {
         method: "POST",
-
         headers: {
-          "Content-Type":
-            "application/json"
+          "Content-Type": "application/json"
         },
-
         body: JSON.stringify({
           api_key: apiKey,
           query,
@@ -166,8 +147,7 @@ async function webSearch(query) {
     );
 
     if (!response.ok) {
-      const errorText =
-        await response.text();
+      const errorText = await response.text();
 
       console.error(
         "Tavily error:",
@@ -182,8 +162,7 @@ async function webSearch(query) {
       };
     }
 
-    const data =
-      await response.json();
+    const data = await response.json();
 
     return {
       success: true,
@@ -209,10 +188,7 @@ async function webSearch(query) {
 // SAVE RESEARCH
 // ==========================================
 
-async function saveResearch(
-  query,
-  results
-) {
+async function saveResearch(query, results) {
   const { error } = await supabase
     .from("research")
     .insert({
@@ -229,7 +205,7 @@ async function saveResearch(
 }
 
 // ==========================================
-// DETECT WEB RESEARCH
+// RESEARCH DETECTION
 // ==========================================
 
 function needsWebResearch(command) {
@@ -252,8 +228,7 @@ function needsWebResearch(command) {
     "updates"
   ];
 
-  const text =
-    command.toLowerCase();
+  const text = command.toLowerCase();
 
   return words.some(word =>
     text.includes(word)
@@ -266,12 +241,14 @@ function needsWebResearch(command) {
 
 function cleanSearchResults(results) {
   return results
-    .filter(item =>
-      item &&
-      item.title &&
-      item.url &&
-      item.content
-    )
+    .filter(item => {
+      return (
+        item &&
+        item.title &&
+        item.url &&
+        item.content
+      );
+    })
     .map(item => ({
       title: item.title,
       url: item.url,
@@ -280,7 +257,7 @@ function cleanSearchResults(results) {
 }
 
 // ==========================================
-// BUILD RESEARCH TEXT
+// RESEARCH TEXT
 // ==========================================
 
 function buildResearchText(
@@ -291,15 +268,13 @@ function buildResearchText(
     return `
 No usable web research was returned.
 
-IMPORTANT:
 Do not make current-event claims.
 `;
   }
 
-  const sourceText =
-    results
-      .map(
-        (item, index) => `
+  const sourceText = results
+    .map(
+      (item, index) => `
 SOURCE ${index + 1}
 
 TITLE:
@@ -311,8 +286,8 @@ ${item.url}
 CONTENT:
 ${item.content}
 `
-      )
-      .join("\n");
+    )
+    .join("\n");
 
   return `
 TAVILY SUMMARY:
@@ -325,109 +300,136 @@ ${sourceText}
 }
 
 // ==========================================
-// GENERATE REAL IMAGE
+// REAL IMAGE GENERATION
 // ==========================================
 
-async function generateImage(imagePrompt) {
+async function generateImage(imageIdea) {
   console.log(
-    "Generating real image with Gemini..."
+    "🎨 Starting real image generation..."
   );
 
+  if (!process.env.GEMINI_API_KEY) {
+    console.error(
+      "❌ GEMINI_API_KEY is missing."
+    );
+
+    return null;
+  }
+
   try {
-    const interaction =
-      await ai.interactions.create({
-        model: "gemini-3.1-flash-image",
+    const prompt = `
+Create a professional image for a social media post.
 
-        input: imagePrompt,
+Image concept:
+${imageIdea}
 
-        response_format: {
-          type: "image",
-          mime_type: "image/png",
-          aspect_ratio: "16:9",
-          image_size: "1K"
+Requirements:
+- Professional
+- Modern
+- High quality
+- Clean composition
+- Visually engaging
+- Suitable for X/Twitter
+- Landscape 16:9 composition
+- No watermark
+- No unnecessary text
+`;
+
+    const response =
+      await ai.models.generateContent({
+        model: "gemini-2.0-flash-exp",
+        contents: prompt,
+        config: {
+          responseModalities: [
+            "TEXT",
+            "IMAGE"
+          ]
         }
       });
 
-    if (
-      !interaction ||
-      !interaction.output_image ||
-      !interaction.output_image.data
-    ) {
-      console.error(
-        "Gemini returned no image."
+    const parts =
+      response.candidates?.[0]
+        ?.content?.parts || [];
+
+    const imagePart =
+      parts.find(
+        part =>
+          part.inlineData &&
+          part.inlineData.data
       );
 
-      return {
-        success: false,
-        imageUrl: null
-      };
+    if (!imagePart) {
+      console.error(
+        "❌ Gemini did not return an image."
+      );
+
+      return null;
     }
 
     const imageBuffer =
       Buffer.from(
-        interaction.output_image.data,
+        imagePart.inlineData.data,
         "base64"
       );
 
-    const filename =
-      `social-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}.png`;
+    const fileName =
+      `ai-social-${Date.now()}.png`;
 
     console.log(
-      "Uploading image to Supabase..."
+      "☁️ Uploading image to Supabase..."
     );
 
-    const { error: uploadError } =
+    const { error } =
       await supabase.storage
         .from(IMAGE_BUCKET)
         .upload(
-          filename,
+          fileName,
           imageBuffer,
           {
             contentType: "image/png",
-            upsert: false,
-            cacheControl: "31536000"
+            cacheControl: "31536000",
+            upsert: false
           }
         );
 
-    if (uploadError) {
+    if (error) {
       console.error(
-        "Image upload error:",
-        uploadError
+        "❌ Supabase image upload error:",
+        error
       );
 
-      return {
-        success: false,
-        imageUrl: null
-      };
+      return null;
     }
 
     const { data } =
       supabase.storage
         .from(IMAGE_BUCKET)
-        .getPublicUrl(filename);
+        .getPublicUrl(fileName);
+
+    if (!data?.publicUrl) {
+      console.error(
+        "❌ Could not create public image URL."
+      );
+
+      return null;
+    }
 
     console.log(
-      "Image generated successfully."
+      "✅ REAL IMAGE GENERATED:"
     );
 
-    return {
-      success: true,
-      imageUrl: data.publicUrl,
-      filename
-    };
+    console.log(data.publicUrl);
+
+    return data.publicUrl;
 
   } catch (error) {
     console.error(
-      "Image generation error:",
-      error
+      "❌ IMAGE GENERATION ERROR:"
     );
 
-    return {
-      success: false,
-      imageUrl: null
-    };
+    console.error(error);
+
+    return null;
   }
 }
 
@@ -435,191 +437,179 @@ async function generateImage(imagePrompt) {
 // COMMAND
 // ==========================================
 
-app.post(
-  "/command",
-  async (req, res) => {
+app.post("/command", async (req, res) => {
+  const { command } = req.body;
 
-    const { command } =
-      req.body;
+  if (!command) {
+    return res.status(400).json({
+      success: false,
+      error: "Please provide a command."
+    });
+  }
 
-    if (!command) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Please provide a command."
+  try {
+    const lowerCommand =
+      command.toLowerCase();
+
+    // ======================================
+    // REMEMBER
+    // ======================================
+
+    const rememberWords = [
+      "remember that",
+      "remember this",
+      "remember:"
+    ];
+
+    const isRememberCommand =
+      rememberWords.some(word =>
+        lowerCommand.includes(word)
+      );
+
+    if (isRememberCommand) {
+      let memory = command;
+
+      for (const word of rememberWords) {
+        memory = memory
+          .replace(
+            new RegExp(word, "i"),
+            ""
+          )
+          .trim();
+      }
+
+      const saved =
+        await saveMemory(memory);
+
+      if (!saved) {
+        return res.status(500).json({
+          success: false,
+          error:
+            "I could not save that memory."
+        });
+      }
+
+      return res.json({
+        success: true,
+        type: "memory",
+        message:
+          "Got it. I saved that to my memory.",
+        memory
       });
     }
 
-    try {
+    // ======================================
+    // MEMORY QUESTION
+    // ======================================
 
-      const lowerCommand =
-        command.toLowerCase();
+    const memoryWords = [
+      "what do you remember",
+      "what you remember",
+      "show my memories",
+      "my memories",
+      "what have you remembered"
+    ];
 
-      // ====================================
-      // REMEMBER
-      // ====================================
+    const isMemoryQuestion =
+      memoryWords.some(word =>
+        lowerCommand.includes(word)
+      );
 
-      const rememberWords = [
-        "remember that",
-        "remember this",
-        "remember:"
-      ];
+    const memories =
+      await getMemories();
 
-      const isRememberCommand =
-        rememberWords.some(word =>
-          lowerCommand.includes(word)
-        );
+    if (isMemoryQuestion) {
+      return res.json({
+        success: true,
+        type: "memory",
+        memories
+      });
+    }
 
-      if (isRememberCommand) {
+    // ======================================
+    // PREVIOUS POSTS
+    // ======================================
 
-        let memory = command;
+    const previousPosts =
+      await getPreviousPosts();
 
-        for (
-          const word of rememberWords
-        ) {
-          memory = memory
-            .replace(
-              new RegExp(word, "i"),
-              ""
+    const memoryText =
+      memories.length
+        ? memories
+            .map(
+              (item, index) =>
+                `${index + 1}. ${item.memory}`
             )
-            .trim();
+            .join("\n")
+        : "No saved memories yet.";
+
+    const postHistoryText =
+      previousPosts.length
+        ? previousPosts
+            .map(
+              (item, index) =>
+                `${index + 1}. ${item.post}`
+            )
+            .join("\n\n")
+        : "No previous posts yet.";
+
+    // ======================================
+    // WEB RESEARCH
+    // ======================================
+
+    let researchText =
+      "No web research was requested.";
+
+    let researchSources = [];
+
+    const shouldSearch =
+      needsWebResearch(command);
+
+    if (shouldSearch) {
+      console.log(
+        "🔎 Starting Tavily research..."
+      );
+
+      const search =
+        await webSearch(command);
+
+      if (search.success) {
+        const cleanResults =
+          cleanSearchResults(
+            search.results
+          );
+
+        researchSources =
+          cleanResults;
+
+        researchText =
+          buildResearchText(
+            search.answer,
+            cleanResults
+          );
+
+        if (cleanResults.length) {
+          await saveResearch(
+            command,
+            cleanResults
+          );
         }
 
-        const saved =
-          await saveMemory(memory);
-
-        if (!saved) {
-          return res.status(500).json({
-            success: false,
-            error:
-              "I could not save that memory."
-          });
-        }
-
-        return res.json({
-          success: true,
-          type: "memory",
-          message:
-            "Got it. I saved that to my memory.",
-          memory
-        });
-      }
-
-      // ====================================
-      // GET MEMORIES
-      // ====================================
-
-      const memoryWords = [
-        "what do you remember",
-        "what you remember",
-        "show my memories",
-        "my memories",
-        "what have you remembered"
-      ];
-
-      const isMemoryQuestion =
-        memoryWords.some(word =>
-          lowerCommand.includes(word)
-        );
-
-      const memories =
-        await getMemories();
-
-      if (isMemoryQuestion) {
-        return res.json({
-          success: true,
-          type: "memory",
-          memories
-        });
-      }
-
-      // ====================================
-      // PREVIOUS POSTS
-      // ====================================
-
-      const previousPosts =
-        await getPreviousPosts();
-
-      const memoryText =
-        memories.length > 0
-          ? memories
-              .map(
-                (item, index) =>
-                  `${index + 1}. ${item.memory}`
-              )
-              .join("\n")
-          : "No saved memories yet.";
-
-      const postHistoryText =
-        previousPosts.length > 0
-          ? previousPosts
-              .map(
-                (item, index) =>
-                  `${index + 1}. ${item.post}`
-              )
-              .join("\n\n")
-          : "No previous posts yet.";
-
-      // ====================================
-      // WEB RESEARCH
-      // ====================================
-
-      let researchText =
-        "No web research was requested.";
-
-      let researchSources = [];
-
-      const shouldSearch =
-        needsWebResearch(command);
-
-      if (shouldSearch) {
-
-        console.log(
-          "Starting Tavily research..."
-        );
-
-        const search =
-          await webSearch(command);
-
-        if (search.success) {
-
-          const cleanResults =
-            cleanSearchResults(
-              search.results
-            );
-
-          researchSources =
-            cleanResults;
-
-          researchText =
-            buildResearchText(
-              search.answer,
-              cleanResults
-            );
-
-          if (cleanResults.length) {
-            await saveResearch(
-              command,
-              cleanResults
-            );
-          }
-
-        } else {
-
-          researchText = `
+      } else {
+        researchText = `
 Tavily research failed.
 
 Do not invent current information.
 Do not pretend research was successful.
 `;
-        }
       }
+    }
 
-      // ====================================
-      // GEMINI POST
-      // ====================================
+    // ======================================
+    // GEMINI POST PROMPT
+    // ======================================
 
-      const prompt = `
+    const prompt = `
 You are the AI brain of a professional
 production-oriented social media agent.
 
@@ -642,14 +632,19 @@ RULES:
 3. Avoid repeating previous posts.
 4. Use web research for current claims.
 5. Never invent current news.
-6. Never invent numbers or dates.
-7. Never invent URLs.
-8. Prefer recent and reliable sources.
-9. Write naturally and professionally.
-10. Follow the user's command.
-11. Do not copy source articles.
+6. Never invent numbers.
+7. Never invent dates.
+8. Never invent URLs.
+9. Prefer recent reliable sources.
+10. Write naturally.
+11. Keep content professional.
+12. Make it engaging.
+13. Follow the user's command exactly.
+14. Create a useful IMAGE_IDEA for every
+social media post.
 
-When creating a post, return exactly:
+When creating a social media post,
+return exactly:
 
 POST:
 [actual post]
@@ -658,159 +653,132 @@ HASHTAGS:
 [relevant hashtags]
 
 IMAGE_IDEA:
-[detailed image description]
+[detailed visual description]
 
 SOURCES:
-[URLs only when web research was used]
+[URLs if web research was used]
 `;
 
-      const response =
-        await ai.models.generateContent({
-          model: "gemini-3.6-flash",
-          contents: prompt
-        });
-
-      const result =
-        response.text || "";
-
-      // ====================================
-      // EXTRACT POST
-      // ====================================
-
-      let postText = result;
-      let hashtags = "";
-      let imageIdea = "";
-
-      const hashtagMatch =
-        result.match(
-          /HASHTAGS:\s*([\s\S]*?)(?=\nIMAGE_IDEA:|$)/i
-        );
-
-      const imageMatch =
-        result.match(
-          /IMAGE_IDEA:\s*([\s\S]*?)(?=\nSOURCES:|$)/i
-        );
-
-      const postMatch =
-        result.match(
-          /POST:\s*([\s\S]*?)(?=\nHASHTAGS:|$)/i
-        );
-
-      if (postMatch) {
-        postText =
-          postMatch[1].trim();
-      }
-
-      if (hashtagMatch) {
-        hashtags =
-          hashtagMatch[1].trim();
-      }
-
-      if (imageMatch) {
-        imageIdea =
-          imageMatch[1].trim();
-      }
-
-      // ====================================
-      // REAL IMAGE GENERATION
-      // ====================================
-
-      let imageUrl = null;
-
-      if (imageIdea) {
-
-        const fullImagePrompt = `
-Create a professional social-media image
-based on this description:
-
-${imageIdea}
-
-Style:
-- modern
-- clean
-- professional
-- high quality
-- suitable for X/Twitter
-- visually engaging
-- no unnecessary text
-- no watermark
-- 16:9 landscape composition
-`;
-
-        const generatedImage =
-          await generateImage(
-            fullImagePrompt
-          );
-
-        if (generatedImage.success) {
-          imageUrl =
-            generatedImage.imageUrl;
-        }
-      }
-
-      // ====================================
-      // SAVE POST
-      // ====================================
-
-      await savePost(
-        command,
-        postText,
-        hashtags,
-        imageIdea,
-        imageUrl
-      );
-
-      // ====================================
-      // RESPONSE
-      // ====================================
-
-      return res.json({
-        success: true,
-
-        command,
-
-        response: result,
-
-        post: postText,
-
-        hashtags,
-
-        image_idea: imageIdea,
-
-        image_generated:
-          Boolean(imageUrl),
-
-        image_url:
-          imageUrl,
-
-        memory_used:
-          memories.length,
-
-        previous_posts_checked:
-          previousPosts.length,
-
-        web_research_used:
-          shouldSearch,
-
-        research_sources:
-          researchSources.length
+    const response =
+      await ai.models.generateContent({
+        model: "gemini-3.6-flash",
+        contents: prompt
       });
 
-    } catch (error) {
+    const result =
+      response.text || "";
 
-      console.error(
-        "AI error:",
-        error
+    // ======================================
+    // EXTRACT POST
+    // ======================================
+
+    let postText = result;
+    let hashtags = "";
+    let imageIdea = "";
+
+    const postMatch =
+      result.match(
+        /POST:\s*([\s\S]*?)(?=\nHASHTAGS:|$)/i
       );
 
-      return res.status(500).json({
-        success: false,
-        error:
-          "AI could not process the command."
-      });
+    const hashtagMatch =
+      result.match(
+        /HASHTAGS:\s*([\s\S]*?)(?=\nIMAGE_IDEA:|$)/i
+      );
+
+    const imageMatch =
+      result.match(
+        /IMAGE_IDEA:\s*([\s\S]*?)(?=\nSOURCES:|$)/i
+      );
+
+    if (postMatch) {
+      postText =
+        postMatch[1].trim();
     }
+
+    if (hashtagMatch) {
+      hashtags =
+        hashtagMatch[1].trim();
+    }
+
+    if (imageMatch) {
+      imageIdea =
+        imageMatch[1].trim();
+    }
+
+    // ======================================
+    // GENERATE REAL IMAGE
+    // ======================================
+
+    let imageUrl = null;
+
+    if (imageIdea) {
+      imageUrl =
+        await generateImage(
+          imageIdea
+        );
+    }
+
+    // ======================================
+    // SAVE POST
+    // ======================================
+
+    await savePost(
+      command,
+      postText,
+      hashtags,
+      imageIdea
+    );
+
+    // ======================================
+    // RETURN RESULT
+    // ======================================
+
+    return res.json({
+      success: true,
+
+      command,
+
+      response: result,
+
+      post: postText,
+
+      hashtags,
+
+      image_idea: imageIdea,
+
+      image_generated:
+        Boolean(imageUrl),
+
+      image_url:
+        imageUrl,
+
+      memory_used:
+        memories.length,
+
+      previous_posts_checked:
+        previousPosts.length,
+
+      web_research_used:
+        shouldSearch,
+
+      research_sources:
+        researchSources.length
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ AI error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error:
+        "AI could not process the command."
+    });
   }
-);
+});
 
 // ==========================================
 // START SERVER
