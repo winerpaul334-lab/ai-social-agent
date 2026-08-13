@@ -1,942 +1,1209 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
   <title>AI Social Agent</title>
 
+
   <style>
+
     * {
       box-sizing: border-box;
     }
 
+
     body {
+
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f5f7fb;
-      color: #111827;
+
+      font-family:
+        Arial,
+        sans-serif;
+
+      background:
+        #f5f7fb;
+
+      color:
+        #111827;
+
     }
+
 
     .container {
+
       width: 100%;
-      max-width: 700px;
+
+      max-width: 800px;
+
       margin: auto;
+
       padding: 20px;
+
     }
+
 
     .header {
-      margin-bottom: 25px;
+
+      margin-bottom:
+        25px;
+
     }
+
 
     .header h1 {
-      margin-bottom: 8px;
-      font-size: 28px;
+
+      margin-bottom:
+        8px;
+
+      font-size:
+        28px;
+
     }
+
 
     .header p {
-      color: #6b7280;
-      margin: 0;
+
+      color:
+        #6b7280;
+
+      margin:
+        0;
+
     }
+
 
     .card {
-      background: white;
-      padding: 18px;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+
+      background:
+        white;
+
+      padding:
+        18px;
+
+      border-radius:
+        16px;
+
+      box-shadow:
+        0 4px 20px
+        rgba(0,0,0,0.06);
+
     }
+
 
     textarea {
-      width: 100%;
-      height: 130px;
-      resize: vertical;
-      padding: 15px;
-      border: 1px solid #d1d5db;
-      border-radius: 12px;
-      font-size: 16px;
-      outline: none;
-      font-family: inherit;
+
+      width:
+        100%;
+
+      height:
+        130px;
+
+      resize:
+        vertical;
+
+      padding:
+        15px;
+
+      border:
+        1px solid #d1d5db;
+
+      border-radius:
+        12px;
+
+      font-size:
+        16px;
+
+      outline:
+        none;
+
+      font-family:
+        inherit;
+
     }
+
 
     textarea:focus {
-      border-color: #111827;
+
+      border-color:
+        #111827;
+
     }
+
 
     .buttons {
-      display: flex;
-      gap: 10px;
-      margin-top: 12px;
+
+      display:
+        flex;
+
+      gap:
+        10px;
+
+      margin-top:
+        12px;
+
     }
+
 
     button {
-      flex: 1;
-      padding: 13px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      cursor: pointer;
-      font-weight: bold;
+
+      flex:
+        1;
+
+      padding:
+        13px;
+
+      border:
+        none;
+
+      border-radius:
+        10px;
+
+      font-size:
+        16px;
+
+      cursor:
+        pointer;
+
+      font-weight:
+        bold;
+
     }
+
 
     #sendButton {
-      background: #111827;
-      color: white;
+
+      background:
+        #111827;
+
+      color:
+        white;
+
     }
+
 
     #voiceButton {
-      background: #e5e7eb;
-      color: #111827;
+
+      background:
+        #e5e7eb;
+
+      color:
+        #111827;
+
     }
+
 
     #voiceButton.listening {
-      background: #dc2626;
-      color: white;
+
+      background:
+        #dc2626;
+
+      color:
+        white;
+
     }
+
 
     button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+
+      opacity:
+        0.6;
+
+      cursor:
+        not-allowed;
+
     }
+
 
     .status {
-      margin-top: 12px;
-      font-size: 14px;
-      color: #6b7280;
-      min-height: 20px;
+
+      margin-top:
+        12px;
+
+      font-size:
+        14px;
+
+      color:
+        #6b7280;
+
+      min-height:
+        20px;
+
     }
 
-    .result {
-      margin-top: 20px;
+
+    #response {
+
+      margin-top:
+        20px;
+
+      background:
+        #f9fafb;
+
+      border-radius:
+        12px;
+
+      padding:
+        16px;
+
+      line-height:
+        1.6;
+
+      min-height:
+        80px;
+
+      overflow:
+        hidden;
+
     }
 
-    .result-section {
-      background: #f9fafb;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 14px;
+
+    .post {
+
+      white-space:
+        pre-wrap;
+
+      word-wrap:
+        break-word;
+
     }
 
-    .result-title {
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #111827;
-    }
-
-    .post-text {
-      white-space: pre-wrap;
-      line-height: 1.7;
-      word-wrap: break-word;
-    }
 
     .hashtags {
-      color: #2563eb;
-      line-height: 1.6;
+
+      margin-top:
+        15px;
+
+      font-weight:
+        bold;
+
+      color:
+        #374151;
+
     }
 
-    .image-container {
-      margin-top: 10px;
-    }
 
     .generated-image {
-      width: 100%;
-      display: block;
-      border-radius: 12px;
-      margin-top: 10px;
-      background: #e5e7eb;
+
+      width:
+        100%;
+
+      display:
+        block;
+
+      margin-top:
+        12px;
+
+      border-radius:
+        14px;
+
+      box-shadow:
+        0 5px 20px
+        rgba(0,0,0,0.12);
+
     }
 
-    .image-link {
-      display: inline-block;
-      margin-top: 10px;
-      color: #2563eb;
-      text-decoration: none;
-      font-weight: bold;
-    }
-
-    .image-link:hover {
-      text-decoration: underline;
-    }
-
-    .image-loading {
-      padding: 25px;
-      text-align: center;
-      background: #f3f4f6;
-      border-radius: 12px;
-      color: #6b7280;
-    }
 
     .image-error {
-      padding: 15px;
-      background: #fef2f2;
-      color: #b91c1c;
-      border-radius: 10px;
+
+      margin-top:
+        15px;
+
+      padding:
+        12px;
+
+      border-radius:
+        10px;
+
+      background:
+        #fee2e2;
+
+      color:
+        #991b1b;
+
     }
 
-    .image-idea {
-      color: #4b5563;
-      line-height: 1.6;
-    }
 
     .sources {
-      line-height: 1.6;
-      word-break: break-word;
+
+      margin-top:
+        15px;
+
+      font-size:
+        14px;
+
     }
 
-    .source-link {
-      display: block;
-      color: #2563eb;
-      margin-bottom: 8px;
-      text-decoration: none;
+
+    .sources a {
+
+      display:
+        block;
+
+      margin-top:
+        5px;
+
+      color:
+        #2563eb;
+
+      word-break:
+        break-all;
+
     }
 
-    .source-link:hover {
-      text-decoration: underline;
-    }
 
     .example {
-      margin-top: 20px;
-      color: #6b7280;
-      font-size: 14px;
+
+      margin-top:
+        20px;
+
+      color:
+        #6b7280;
+
+      font-size:
+        14px;
+
     }
+
 
     .example div {
-      background: #f3f4f6;
-      padding: 10px;
-      border-radius: 8px;
-      margin-top: 8px;
-      cursor: pointer;
+
+      background:
+        #f3f4f6;
+
+      padding:
+        10px;
+
+      border-radius:
+        8px;
+
+      margin-top:
+        8px;
+
+      cursor:
+        pointer;
+
     }
+
 
     .example div:hover {
-      background: #e5e7eb;
+
+      background:
+        #e5e7eb;
+
     }
 
-    .hidden {
-      display: none;
-    }
 
     @media (max-width: 500px) {
+
       .container {
-        padding: 15px;
+
+        padding:
+          15px;
+
       }
+
 
       .buttons {
-        flex-direction: column;
+
+        flex-direction:
+          column;
+
       }
 
-      .header h1 {
-        font-size: 24px;
-      }
     }
+
   </style>
+
 </head>
+
 
 <body>
 
+
   <div class="container">
 
+
     <div class="header">
-      <h1>🤖 AI Social Agent</h1>
-      <p>Type or speak a command to your AI agent.</p>
+
+      <h1>
+        🤖 AI Social Agent
+      </h1>
+
+      <p>
+        Type or speak a command to your AI agent.
+      </p>
+
     </div>
 
+
     <div class="card">
+
 
       <textarea
         id="command"
         placeholder="Type your command here...
 
 Example:
-Create a professional post about AI and generate a real image for it."
+Create a professional AI post and generate a real image."
       ></textarea>
+
 
       <div class="buttons">
 
-        <button id="sendButton" onclick="sendCommand()">
+
+        <button
+          id="sendButton"
+          onclick="sendCommand()"
+        >
           Send Command
         </button>
 
-        <button id="voiceButton" onclick="toggleVoice()">
+
+        <button
+          id="voiceButton"
+          onclick="toggleVoice()"
+        >
           🎤 Speak
         </button>
 
+
       </div>
 
-      <div id="status" class="status">
+
+      <div
+        id="status"
+        class="status"
+      >
         Ready.
       </div>
 
-      <!-- RESULTS -->
 
-      <div id="result" class="result hidden">
+      <div id="response">
 
-        <!-- POST -->
-
-        <div class="result-section">
-
-          <div class="result-title">
-            📝 Post
-          </div>
-
-          <div
-            id="post"
-            class="post-text"
-          ></div>
-
-        </div>
-
-        <!-- HASHTAGS -->
-
-        <div class="result-section">
-
-          <div class="result-title">
-            # Hashtags
-          </div>
-
-          <div
-            id="hashtags"
-            class="hashtags"
-          ></div>
-
-        </div>
-
-        <!-- IMAGE -->
-
-        <div class="result-section">
-
-          <div class="result-title">
-            🖼️ Generated Image
-          </div>
-
-          <div
-            id="imageContainer"
-            class="image-container"
-          ></div>
-
-        </div>
-
-        <!-- IMAGE IDEA -->
-
-        <div class="result-section">
-
-          <div class="result-title">
-            💡 Image Idea
-          </div>
-
-          <div
-            id="imageIdea"
-            class="image-idea"
-          ></div>
-
-        </div>
-
-        <!-- SOURCES -->
-
-        <div
-          id="sourcesSection"
-          class="result-section hidden"
-        >
-
-          <div class="result-title">
-            🔗 Sources
-          </div>
-
-          <div
-            id="sources"
-            class="sources"
-          ></div>
-
-        </div>
+        Waiting for your command...
 
       </div>
 
-      <!-- EXAMPLES -->
 
       <div class="example">
 
-        <strong>Try saying or typing:</strong>
+        <strong>
+          Try saying or typing:
+        </strong>
 
-        <div onclick="useExample(
-          'Create a motivational post about never giving up and generate a real image for it.'
-        )">
+
+        <div
+          onclick="useExample(
+            'Create a professional AI post about robotics and generate a real image for it.'
+          )"
+        >
+          Create a professional AI post about robotics and generate a real image for it.
+        </div>
+
+
+        <div
+          onclick="useExample(
+            'Create a motivational post about never giving up and generate a real image for it.'
+          )"
+        >
           Create a motivational post about never giving up and generate a real image for it.
         </div>
 
-        <div onclick="useExample(
-          'Create a professional post about artificial intelligence and generate a real image for it.'
-        )">
-          Create a professional AI post and generate a real image.
+
+        <div
+          onclick="useExample(
+            'Find the latest AI news and create a professional post with a real image.'
+          )"
+        >
+          Find the latest AI news and create a professional post with a real image.
         </div>
 
-        <div onclick="useExample(
-          'Find the latest AI news and create a professional X post about it with a real image.'
-        )">
-          Find the latest AI news and create a post with a real image.
-        </div>
 
-        <div onclick="useExample(
-          'What do you remember about my posting style?'
-        )">
+        <div
+          onclick="useExample(
+            'What do you remember about my posting style?'
+          )"
+        >
           What do you remember about my posting style?
         </div>
 
+
       </div>
 
+
     </div>
+
 
   </div>
 
 
 <script>
 
-  // ==========================================
-  // ELEMENTS
-  // ==========================================
 
-  const commandBox =
-    document.getElementById("command");
+// ======================================================
+// ELEMENTS
+// ======================================================
 
-  const statusBox =
-    document.getElementById("status");
-
-  const voiceButton =
-    document.getElementById("voiceButton");
-
-  const sendButton =
-    document.getElementById("sendButton");
-
-  const resultBox =
-    document.getElementById("result");
-
-  const postBox =
-    document.getElementById("post");
-
-  const hashtagsBox =
-    document.getElementById("hashtags");
-
-  const imageContainer =
-    document.getElementById("imageContainer");
-
-  const imageIdeaBox =
-    document.getElementById("imageIdea");
-
-  const sourcesBox =
-    document.getElementById("sources");
-
-  const sourcesSection =
-    document.getElementById("sourcesSection");
+const commandBox =
+  document.getElementById(
+    "command"
+  );
 
 
-  // ==========================================
-  // SEND COMMAND
-  // ==========================================
+const responseBox =
+  document.getElementById(
+    "response"
+  );
 
-  async function sendCommand() {
 
-    const command =
-      commandBox.value.trim();
+const statusBox =
+  document.getElementById(
+    "status"
+  );
 
-    if (!command) {
 
-      statusBox.textContent =
-        "Please enter or speak a command.";
+const voiceButton =
+  document.getElementById(
+    "voiceButton"
+  );
 
-      return;
-    }
 
-    sendButton.disabled = true;
+const sendButton =
+  document.getElementById(
+    "sendButton"
+  );
 
-    resultBox.classList.remove("hidden");
+
+// ======================================================
+// SEND COMMAND
+// ======================================================
+
+async function sendCommand() {
+
+
+  const command =
+    commandBox.value.trim();
+
+
+  if (!command) {
 
     statusBox.textContent =
-      "AI is working... 🤖";
+      "Please enter a command.";
 
-    postBox.textContent =
-      "Generating your post...";
+    return;
 
-    hashtagsBox.textContent =
+  }
+
+
+  sendButton.disabled =
+    true;
+
+
+  statusBox.textContent =
+    "Processing... 🤖";
+
+
+  responseBox.innerHTML =
+    "<p>Your AI agent is working...</p>";
+
+
+  try {
+
+
+    const response =
+      await fetch(
+        "/command",
+        {
+
+          method:
+            "POST",
+
+          headers:
+            {
+              "Content-Type":
+                "application/json"
+            },
+
+          body:
+            JSON.stringify({
+              command:
+                command
+            })
+
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        data.error ||
+        "Request failed."
+      );
+
+    }
+
+
+    // ==================================================
+    // MEMORY RESPONSE
+    // ==================================================
+
+    if (
+      data.type ===
+      "memory"
+    ) {
+
+      responseBox.innerHTML =
+        "";
+
+
+      const title =
+        document.createElement(
+          "h3"
+        );
+
+      title.textContent =
+        "🧠 Memory";
+
+
+      responseBox.appendChild(
+        title
+      );
+
+
+      if (
+        data.memories &&
+        data.memories.length
+      ) {
+
+        data.memories.forEach(
+          item => {
+
+            const p =
+              document.createElement(
+                "p"
+              );
+
+            p.textContent =
+              "• " +
+              item.memory;
+
+            responseBox.appendChild(
+              p
+            );
+
+          }
+        );
+
+      } else {
+
+        const p =
+          document.createElement(
+            "p"
+          );
+
+        p.textContent =
+          data.message ||
+          "No memories found.";
+
+        responseBox.appendChild(
+          p
+        );
+
+      }
+
+
+      statusBox.textContent =
+        "Completed successfully ✅";
+
+
+      sendButton.disabled =
+        false;
+
+
+      return;
+
+    }
+
+
+    // ==================================================
+    // NORMAL POST RESPONSE
+    // ==================================================
+
+    responseBox.innerHTML =
       "";
 
-    imageIdeaBox.textContent =
-      "";
 
-    imageContainer.innerHTML = `
-      <div class="image-loading">
-        🎨 Generating your real image...
-        <br><br>
-        Please wait.
-      </div>
-    `;
+    const postTitle =
+      document.createElement(
+        "h3"
+      );
 
-    sourcesBox.innerHTML = "";
+    postTitle.textContent =
+      "📝 Post";
 
-    sourcesSection.classList.add(
-      "hidden"
+
+    responseBox.appendChild(
+      postTitle
     );
 
 
-    try {
-
-      const response =
-        await fetch("/command", {
-
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body: JSON.stringify({
-            command: command
-          })
-
-        });
-
-
-      const data =
-        await response.json();
-
-
-      if (!response.ok) {
-
-        throw new Error(
-          data.error ||
-          "Request failed."
-        );
-
-      }
-
-
-      // ======================================
-      // POST
-      // ======================================
-
-      if (data.post) {
-
-        postBox.textContent =
-          data.post;
-
-      } else if (data.response) {
-
-        postBox.textContent =
-          data.response;
-
-      } else {
-
-        postBox.textContent =
-          "No post was returned.";
-
-      }
-
-
-      // ======================================
-      // HASHTAGS
-      // ======================================
-
-      hashtagsBox.textContent =
-        data.hashtags ||
-        "No hashtags generated.";
-
-
-      // ======================================
-      // IMAGE IDEA
-      // ======================================
-
-      imageIdeaBox.textContent =
-        data.image_idea ||
-        "No image idea returned.";
-
-
-      // ======================================
-      // REAL GENERATED IMAGE
-      // ======================================
-
-      if (
-        data.image_generated &&
-        data.image_url
-      ) {
-
-        console.log(
-          "Generated image:",
-          data.image_url
-        );
-
-        imageContainer.innerHTML = "";
-
-        const image =
-          document.createElement("img");
-
-        image.className =
-          "generated-image";
-
-        image.alt =
-          "AI generated social media image";
-
-        image.src =
-          data.image_url;
-
-        image.onload =
-          function() {
-
-            statusBox.textContent =
-              "Post and image generated successfully ✅";
-
-          };
-
-        image.onerror =
-          function() {
-
-            imageContainer.innerHTML = `
-              <div class="image-error">
-                The image was generated, but the browser
-                could not load it.
-              </div>
-
-              <a
-                class="image-link"
-                href="${escapeAttribute(data.image_url)}"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open generated image
-              </a>
-            `;
-
-            statusBox.textContent =
-              "Post generated, but image could not be displayed.";
-
-          };
-
-        imageContainer.appendChild(
-          image
-        );
-
-
-        const link =
-          document.createElement("a");
-
-        link.className =
-          "image-link";
-
-        link.href =
-          data.image_url;
-
-        link.target =
-          "_blank";
-
-        link.rel =
-          "noopener noreferrer";
-
-        link.textContent =
-          "Open image in new tab ↗";
-
-        imageContainer.appendChild(
-          link
-        );
-
-
-      } else {
-
-        imageContainer.innerHTML = `
-          <div class="image-error">
-            ❌ The AI created an image idea,
-            but no real image was returned.
-          </div>
-        `;
-
-        statusBox.textContent =
-          "Post completed, but image generation failed.";
-
-      }
-
-
-      // ======================================
-      // SOURCES
-      // ======================================
-
-      if (
-        data.response &&
-        data.response.includes("SOURCES:")
-      ) {
-
-        const sourceText =
-          data.response
-            .split("SOURCES:")
-            [1]
-            .trim();
-
-        if (
-          sourceText &&
-          sourceText !== "N/A" &&
-          sourceText !== "None"
-        ) {
-
-          sourcesBox.textContent =
-            sourceText;
-
-          sourcesSection.classList.remove(
-            "hidden"
-          );
-
-        }
-
-      }
-
-
-    } catch (error) {
-
-      console.error(
-        "Command error:",
-        error
+    const post =
+      document.createElement(
+        "div"
       );
 
-      statusBox.textContent =
-        "Error: " +
-        error.message;
+    post.className =
+      "post";
 
-      postBox.textContent =
-        "Something went wrong.";
+    post.textContent =
+      data.post ||
+      data.response ||
+      "No post returned.";
 
-      imageContainer.innerHTML = `
-        <div class="image-error">
-          ❌ ${escapeHtml(error.message)}
-        </div>
-      `;
+    responseBox.appendChild(
+      post
+    );
+
+
+    // ==================================================
+    // HASHTAGS
+    // ==================================================
+
+    if (
+      data.hashtags
+    ) {
+
+      const hashtags =
+        document.createElement(
+          "div"
+        );
+
+      hashtags.className =
+        "hashtags";
+
+      hashtags.textContent =
+        data.hashtags;
+
+      responseBox.appendChild(
+        hashtags
+      );
 
     }
 
 
-    sendButton.disabled =
-      false;
+    // ==================================================
+    // IMAGE
+    // ==================================================
 
-  }
-
-
-  // ==========================================
-  // ESCAPE HTML
-  // ==========================================
-
-  function escapeHtml(text) {
-
-    const div =
-      document.createElement("div");
-
-    div.textContent =
-      text || "";
-
-    return div.innerHTML;
-
-  }
-
-
-  // ==========================================
-  // ESCAPE ATTRIBUTE
-  // ==========================================
-
-  function escapeAttribute(text) {
-
-    return String(text || "")
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-  }
-
-
-  // ==========================================
-  // VOICE RECOGNITION
-  // ==========================================
-
-  let recognition =
-    null;
-
-  let listening =
-    false;
-
-
-  const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-
-  if (SpeechRecognition) {
-
-    recognition =
-      new SpeechRecognition();
-
-    recognition.continuous =
-      false;
-
-    recognition.interimResults =
-      true;
-
-    recognition.lang =
-      "en-US";
-
-
-    recognition.onstart =
-      function() {
-
-        listening =
-          true;
-
-        voiceButton.classList.add(
-          "listening"
-        );
-
-        voiceButton.textContent =
-          "🔴 Listening...";
-
-        statusBox.textContent =
-          "Speak your command...";
-
-      };
-
-
-    recognition.onresult =
-      function(event) {
-
-        let transcript =
-          "";
-
-        for (
-          let i =
-            event.resultIndex;
-          i <
-            event.results.length;
-          i++
-        ) {
-
-          transcript +=
-            event.results[i][0]
-              .transcript;
-
-        }
-
-        commandBox.value =
-          transcript;
-
-      };
-
-
-    recognition.onend =
-      function() {
-
-        listening =
-          false;
-
-        voiceButton.classList.remove(
-          "listening"
-        );
-
-        voiceButton.textContent =
-          "🎤 Speak";
-
-        statusBox.textContent =
-          "Voice command captured.";
-
-      };
-
-
-    recognition.onerror =
-      function(event) {
-
-        listening =
-          false;
-
-        voiceButton.classList.remove(
-          "listening"
-        );
-
-        voiceButton.textContent =
-          "🎤 Speak";
-
-        statusBox.textContent =
-          "Voice error: " +
-          event.error;
-
-      };
-
-  } else {
-
-    voiceButton.disabled =
-      true;
-
-    voiceButton.textContent =
-      "🎤 Voice not supported";
-
-  }
-
-
-  // ==========================================
-  // TOGGLE VOICE
-  // ==========================================
-
-  function toggleVoice() {
-
-    if (!recognition) {
-
-      alert(
-        "Voice recognition is not supported by this browser."
+    const imageTitle =
+      document.createElement(
+        "h3"
       );
 
-      return;
+    imageTitle.textContent =
+      "🖼️ Generated Image";
 
-    }
+    responseBox.appendChild(
+      imageTitle
+    );
 
 
-    if (listening) {
+    if (
+      data.image_url
+    ) {
 
-      recognition.stop();
+      const image =
+        document.createElement(
+          "img"
+        );
+
+      image.className =
+        "generated-image";
+
+      image.src =
+        data.image_url;
+
+      image.alt =
+        "AI generated image";
+
+      responseBox.appendChild(
+        image
+      );
+
+
+      const success =
+        document.createElement(
+          "p"
+        );
+
+      success.textContent =
+        "✅ Real image generated successfully.";
+
+      responseBox.appendChild(
+        success
+      );
 
     } else {
 
-      recognition.start();
+      const error =
+        document.createElement(
+          "div"
+        );
+
+      error.className =
+        "image-error";
+
+      error.textContent =
+        "❌ The AI created an image idea, but no real image was returned. Check the Render logs.";
+
+      responseBox.appendChild(
+        error
+      );
 
     }
 
+
+    // ==================================================
+    // IMAGE IDEA
+    // ==================================================
+
+    if (
+      data.image_idea
+    ) {
+
+      const ideaTitle =
+        document.createElement(
+          "h3"
+        );
+
+      ideaTitle.textContent =
+        "💡 Image Idea";
+
+
+      responseBox.appendChild(
+        ideaTitle
+      );
+
+
+      const idea =
+        document.createElement(
+          "div"
+        );
+
+      idea.className =
+        "post";
+
+      idea.textContent =
+        data.image_idea;
+
+      responseBox.appendChild(
+        idea
+      );
+
+    }
+
+
+    // ==================================================
+    // STATUS
+    // ==================================================
+
+    if (
+      data.image_generated
+    ) {
+
+      statusBox.textContent =
+        "Post and image generated successfully ✅";
+
+    } else {
+
+      statusBox.textContent =
+        "Post generated, but image generation failed ❌";
+
+    }
+
+
+  } catch (error) {
+
+
+    console.error(
+      error
+    );
+
+
+    responseBox.innerHTML =
+      "";
+
+
+    const errorTitle =
+      document.createElement(
+        "h3"
+      );
+
+    errorTitle.textContent =
+      "❌ Error";
+
+
+    responseBox.appendChild(
+      errorTitle
+    );
+
+
+    const errorText =
+      document.createElement(
+        "p"
+      );
+
+    errorText.textContent =
+      error.message;
+
+    responseBox.appendChild(
+      errorText
+    );
+
+
+    statusBox.textContent =
+      "Something went wrong.";
+
   }
 
 
-  // ==========================================
-  // EXAMPLE COMMAND
-  // ==========================================
+  sendButton.disabled =
+    false;
 
-  function useExample(text) {
-
-    commandBox.value =
-      text;
-
-    commandBox.focus();
-
-  }
+}
 
 
-  // ==========================================
-  // ENTER KEY
-  // ==========================================
+// ======================================================
+// VOICE
+// ======================================================
 
-  commandBox.addEventListener(
-    "keydown",
+let recognition =
+  null;
+
+let listening =
+  false;
+
+
+const SpeechRecognition =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
+
+if (SpeechRecognition) {
+
+
+  recognition =
+    new SpeechRecognition();
+
+
+  recognition.continuous =
+    false;
+
+
+  recognition.interimResults =
+    true;
+
+
+  recognition.lang =
+    "en-US";
+
+
+  recognition.onstart =
+    function() {
+
+      listening =
+        true;
+
+
+      voiceButton.classList.add(
+        "listening"
+      );
+
+
+      voiceButton.textContent =
+        "🔴 Listening...";
+
+
+      statusBox.textContent =
+        "Speak your command...";
+
+    };
+
+
+  recognition.onresult =
     function(event) {
 
-      if (
-        event.key === "Enter" &&
-        !event.shiftKey
+
+      let transcript =
+        "";
+
+
+      for (
+        let i =
+          event.resultIndex;
+
+        i <
+          event.results.length;
+
+        i++
       ) {
 
-        event.preventDefault();
-
-        sendCommand();
+        transcript +=
+          event
+            .results[i][0]
+            .transcript;
 
       }
 
+
+      commandBox.value =
+        transcript;
+
+    };
+
+
+  recognition.onend =
+    function() {
+
+      listening =
+        false;
+
+
+      voiceButton.classList.remove(
+        "listening"
+      );
+
+
+      voiceButton.textContent =
+        "🎤 Speak";
+
+
+      statusBox.textContent =
+        "Voice command captured.";
+
+    };
+
+
+  recognition.onerror =
+    function(event) {
+
+      listening =
+        false;
+
+
+      voiceButton.classList.remove(
+        "listening"
+      );
+
+
+      voiceButton.textContent =
+        "🎤 Speak";
+
+
+      statusBox.textContent =
+        "Voice error: " +
+        event.error;
+
+    };
+
+} else {
+
+
+  voiceButton.disabled =
+    true;
+
+
+  voiceButton.textContent =
+    "🎤 Voice not supported";
+
+}
+
+
+// ======================================================
+// TOGGLE VOICE
+// ======================================================
+
+function toggleVoice() {
+
+
+  if (!recognition) {
+
+    alert(
+      "Voice recognition is not supported."
+    );
+
+    return;
+
+  }
+
+
+  if (listening) {
+
+    recognition.stop();
+
+  } else {
+
+    recognition.start();
+
+  }
+
+}
+
+
+// ======================================================
+// EXAMPLE
+// ======================================================
+
+function useExample(
+  text
+) {
+
+  commandBox.value =
+    text;
+
+  commandBox.focus();
+
+}
+
+
+// ======================================================
+// ENTER
+// ======================================================
+
+commandBox.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (
+      event.key ===
+        "Enter" &&
+      !event.shiftKey
+    ) {
+
+      event.preventDefault();
+
+      sendCommand();
+
     }
-  );
+
+  }
+);
 
 </script>
 
 </body>
-</html>
+
+  </html>
