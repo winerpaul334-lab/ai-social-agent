@@ -105,15 +105,92 @@
       min-height: 20px;
     }
 
-    #response {
+    .result {
       margin-top: 20px;
+    }
+
+    .result-section {
       background: #f9fafb;
       border-radius: 12px;
       padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .result-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #111827;
+    }
+
+    .post-text {
       white-space: pre-wrap;
+      line-height: 1.7;
       word-wrap: break-word;
+    }
+
+    .hashtags {
+      color: #2563eb;
       line-height: 1.6;
-      min-height: 80px;
+    }
+
+    .image-container {
+      margin-top: 10px;
+    }
+
+    .generated-image {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      margin-top: 10px;
+      background: #e5e7eb;
+    }
+
+    .image-link {
+      display: inline-block;
+      margin-top: 10px;
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .image-link:hover {
+      text-decoration: underline;
+    }
+
+    .image-loading {
+      padding: 25px;
+      text-align: center;
+      background: #f3f4f6;
+      border-radius: 12px;
+      color: #6b7280;
+    }
+
+    .image-error {
+      padding: 15px;
+      background: #fef2f2;
+      color: #b91c1c;
+      border-radius: 10px;
+    }
+
+    .image-idea {
+      color: #4b5563;
+      line-height: 1.6;
+    }
+
+    .sources {
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .source-link {
+      display: block;
+      color: #2563eb;
+      margin-bottom: 8px;
+      text-decoration: none;
+    }
+
+    .source-link:hover {
+      text-decoration: underline;
     }
 
     .example {
@@ -134,6 +211,10 @@
       background: #e5e7eb;
     }
 
+    .hidden {
+      display: none;
+    }
+
     @media (max-width: 500px) {
       .container {
         padding: 15px;
@@ -141,6 +222,10 @@
 
       .buttons {
         flex-direction: column;
+      }
+
+      .header h1 {
+        font-size: 24px;
       }
     }
   </style>
@@ -162,7 +247,7 @@
         placeholder="Type your command here...
 
 Example:
-Create a motivational post about never giving up."
+Create a professional post about AI and generate a real image for it."
       ></textarea>
 
       <div class="buttons">
@@ -181,24 +266,118 @@ Create a motivational post about never giving up."
         Ready.
       </div>
 
-      <div id="response">
-        Waiting for your command...
+      <!-- RESULTS -->
+
+      <div id="result" class="result hidden">
+
+        <!-- POST -->
+
+        <div class="result-section">
+
+          <div class="result-title">
+            📝 Post
+          </div>
+
+          <div
+            id="post"
+            class="post-text"
+          ></div>
+
+        </div>
+
+        <!-- HASHTAGS -->
+
+        <div class="result-section">
+
+          <div class="result-title">
+            # Hashtags
+          </div>
+
+          <div
+            id="hashtags"
+            class="hashtags"
+          ></div>
+
+        </div>
+
+        <!-- IMAGE -->
+
+        <div class="result-section">
+
+          <div class="result-title">
+            🖼️ Generated Image
+          </div>
+
+          <div
+            id="imageContainer"
+            class="image-container"
+          ></div>
+
+        </div>
+
+        <!-- IMAGE IDEA -->
+
+        <div class="result-section">
+
+          <div class="result-title">
+            💡 Image Idea
+          </div>
+
+          <div
+            id="imageIdea"
+            class="image-idea"
+          ></div>
+
+        </div>
+
+        <!-- SOURCES -->
+
+        <div
+          id="sourcesSection"
+          class="result-section hidden"
+        >
+
+          <div class="result-title">
+            🔗 Sources
+          </div>
+
+          <div
+            id="sources"
+            class="sources"
+          ></div>
+
+        </div>
+
       </div>
+
+      <!-- EXAMPLES -->
 
       <div class="example">
 
         <strong>Try saying or typing:</strong>
 
-        <div onclick="useExample('Create a motivational post about never giving up.')">
-          Create a motivational post about never giving up.
+        <div onclick="useExample(
+          'Create a motivational post about never giving up and generate a real image for it.'
+        )">
+          Create a motivational post about never giving up and generate a real image for it.
         </div>
 
-        <div onclick="useExample('What do you remember about my posting style?')">
+        <div onclick="useExample(
+          'Create a professional post about artificial intelligence and generate a real image for it.'
+        )">
+          Create a professional AI post and generate a real image.
+        </div>
+
+        <div onclick="useExample(
+          'Find the latest AI news and create a professional X post about it with a real image.'
+        )">
+          Find the latest AI news and create a post with a real image.
+        </div>
+
+        <div onclick="useExample(
+          'What do you remember about my posting style?'
+        )">
           What do you remember about my posting style?
-        </div>
-
-        <div onclick="useExample('Find the latest AI news and create a professional X post about it.')">
-          Find the latest AI news and create a professional X post about it.
         </div>
 
       </div>
@@ -214,11 +393,38 @@ Create a motivational post about never giving up."
   // ELEMENTS
   // ==========================================
 
-  const commandBox = document.getElementById("command");
-  const responseBox = document.getElementById("response");
-  const statusBox = document.getElementById("status");
-  const voiceButton = document.getElementById("voiceButton");
-  const sendButton = document.getElementById("sendButton");
+  const commandBox =
+    document.getElementById("command");
+
+  const statusBox =
+    document.getElementById("status");
+
+  const voiceButton =
+    document.getElementById("voiceButton");
+
+  const sendButton =
+    document.getElementById("sendButton");
+
+  const resultBox =
+    document.getElementById("result");
+
+  const postBox =
+    document.getElementById("post");
+
+  const hashtagsBox =
+    document.getElementById("hashtags");
+
+  const imageContainer =
+    document.getElementById("imageContainer");
+
+  const imageIdeaBox =
+    document.getElementById("imageIdea");
+
+  const sourcesBox =
+    document.getElementById("sources");
+
+  const sourcesSection =
+    document.getElementById("sourcesSection");
 
 
   // ==========================================
@@ -227,79 +433,314 @@ Create a motivational post about never giving up."
 
   async function sendCommand() {
 
-    const command = commandBox.value.trim();
+    const command =
+      commandBox.value.trim();
 
     if (!command) {
-      statusBox.textContent = "Please enter or speak a command.";
+
+      statusBox.textContent =
+        "Please enter or speak a command.";
+
       return;
     }
 
     sendButton.disabled = true;
 
-    statusBox.textContent = "Processing... 🤖";
-    responseBox.textContent = "Your AI agent is thinking...";
+    resultBox.classList.remove("hidden");
+
+    statusBox.textContent =
+      "AI is working... 🤖";
+
+    postBox.textContent =
+      "Generating your post...";
+
+    hashtagsBox.textContent =
+      "";
+
+    imageIdeaBox.textContent =
+      "";
+
+    imageContainer.innerHTML = `
+      <div class="image-loading">
+        🎨 Generating your real image...
+        <br><br>
+        Please wait.
+      </div>
+    `;
+
+    sourcesBox.innerHTML = "";
+
+    sourcesSection.classList.add(
+      "hidden"
+    );
 
 
     try {
 
-      const response = await fetch("/command", {
+      const response =
+        await fetch("/command", {
 
-        method: "POST",
+          method: "POST",
 
-        headers: {
-          "Content-Type": "application/json"
-        },
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
 
-        body: JSON.stringify({
-          command: command
-        })
+          body: JSON.stringify({
+            command: command
+          })
 
-      });
+        });
 
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
 
       if (!response.ok) {
 
         throw new Error(
-          data.error || "Request failed."
+          data.error ||
+          "Request failed."
         );
 
       }
 
 
-      // Show readable response
+      // ======================================
+      // POST
+      // ======================================
 
-      if (data.response) {
+      if (data.post) {
 
-        responseBox.textContent = data.response;
+        postBox.textContent =
+          data.post;
+
+      } else if (data.response) {
+
+        postBox.textContent =
+          data.response;
 
       } else {
 
-        responseBox.textContent =
-          JSON.stringify(data, null, 2);
+        postBox.textContent =
+          "No post was returned.";
 
       }
 
 
-      statusBox.textContent = "Completed successfully ✅";
+      // ======================================
+      // HASHTAGS
+      // ======================================
+
+      hashtagsBox.textContent =
+        data.hashtags ||
+        "No hashtags generated.";
+
+
+      // ======================================
+      // IMAGE IDEA
+      // ======================================
+
+      imageIdeaBox.textContent =
+        data.image_idea ||
+        "No image idea returned.";
+
+
+      // ======================================
+      // REAL GENERATED IMAGE
+      // ======================================
+
+      if (
+        data.image_generated &&
+        data.image_url
+      ) {
+
+        console.log(
+          "Generated image:",
+          data.image_url
+        );
+
+        imageContainer.innerHTML = "";
+
+        const image =
+          document.createElement("img");
+
+        image.className =
+          "generated-image";
+
+        image.alt =
+          "AI generated social media image";
+
+        image.src =
+          data.image_url;
+
+        image.onload =
+          function() {
+
+            statusBox.textContent =
+              "Post and image generated successfully ✅";
+
+          };
+
+        image.onerror =
+          function() {
+
+            imageContainer.innerHTML = `
+              <div class="image-error">
+                The image was generated, but the browser
+                could not load it.
+              </div>
+
+              <a
+                class="image-link"
+                href="${escapeAttribute(data.image_url)}"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open generated image
+              </a>
+            `;
+
+            statusBox.textContent =
+              "Post generated, but image could not be displayed.";
+
+          };
+
+        imageContainer.appendChild(
+          image
+        );
+
+
+        const link =
+          document.createElement("a");
+
+        link.className =
+          "image-link";
+
+        link.href =
+          data.image_url;
+
+        link.target =
+          "_blank";
+
+        link.rel =
+          "noopener noreferrer";
+
+        link.textContent =
+          "Open image in new tab ↗";
+
+        imageContainer.appendChild(
+          link
+        );
+
+
+      } else {
+
+        imageContainer.innerHTML = `
+          <div class="image-error">
+            ❌ The AI created an image idea,
+            but no real image was returned.
+          </div>
+        `;
+
+        statusBox.textContent =
+          "Post completed, but image generation failed.";
+
+      }
+
+
+      // ======================================
+      // SOURCES
+      // ======================================
+
+      if (
+        data.response &&
+        data.response.includes("SOURCES:")
+      ) {
+
+        const sourceText =
+          data.response
+            .split("SOURCES:")
+            [1]
+            .trim();
+
+        if (
+          sourceText &&
+          sourceText !== "N/A" &&
+          sourceText !== "None"
+        ) {
+
+          sourcesBox.textContent =
+            sourceText;
+
+          sourcesSection.classList.remove(
+            "hidden"
+          );
+
+        }
+
+      }
 
 
     } catch (error) {
 
-      console.error(error);
-
-      responseBox.textContent =
-        "Something went wrong. Please try again.";
+      console.error(
+        "Command error:",
+        error
+      );
 
       statusBox.textContent =
-        "Error: " + error.message;
+        "Error: " +
+        error.message;
+
+      postBox.textContent =
+        "Something went wrong.";
+
+      imageContainer.innerHTML = `
+        <div class="image-error">
+          ❌ ${escapeHtml(error.message)}
+        </div>
+      `;
 
     }
 
 
-    sendButton.disabled = false;
+    sendButton.disabled =
+      false;
+
+  }
+
+
+  // ==========================================
+  // ESCAPE HTML
+  // ==========================================
+
+  function escapeHtml(text) {
+
+    const div =
+      document.createElement("div");
+
+    div.textContent =
+      text || "";
+
+    return div.innerHTML;
+
+  }
+
+
+  // ==========================================
+  // ESCAPE ATTRIBUTE
+  // ==========================================
+
+  function escapeAttribute(text) {
+
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
   }
 
@@ -308,8 +749,11 @@ Create a motivational post about never giving up."
   // VOICE RECOGNITION
   // ==========================================
 
-  let recognition = null;
-  let listening = false;
+  let recognition =
+    null;
+
+  let listening =
+    false;
 
 
   const SpeechRecognition =
@@ -319,89 +763,109 @@ Create a motivational post about never giving up."
 
   if (SpeechRecognition) {
 
-    recognition = new SpeechRecognition();
+    recognition =
+      new SpeechRecognition();
 
-    recognition.continuous = false;
+    recognition.continuous =
+      false;
 
-    recognition.interimResults = true;
+    recognition.interimResults =
+      true;
 
-    recognition.lang = "en-US";
-
-
-    recognition.onstart = function() {
-
-      listening = true;
-
-      voiceButton.classList.add("listening");
-
-      voiceButton.textContent =
-        "🔴 Listening...";
-
-      statusBox.textContent =
-        "Speak your command...";
-
-    };
+    recognition.lang =
+      "en-US";
 
 
-    recognition.onresult = function(event) {
+    recognition.onstart =
+      function() {
 
-      let transcript = "";
+        listening =
+          true;
 
-      for (
-        let i = event.resultIndex;
-        i < event.results.length;
-        i++
-      ) {
+        voiceButton.classList.add(
+          "listening"
+        );
 
-        transcript +=
-          event.results[i][0].transcript;
+        voiceButton.textContent =
+          "🔴 Listening...";
 
-      }
+        statusBox.textContent =
+          "Speak your command...";
 
-
-      commandBox.value = transcript;
-
-    };
+      };
 
 
-    recognition.onend = function() {
+    recognition.onresult =
+      function(event) {
 
-      listening = false;
+        let transcript =
+          "";
 
-      voiceButton.classList.remove("listening");
+        for (
+          let i =
+            event.resultIndex;
+          i <
+            event.results.length;
+          i++
+        ) {
 
-      voiceButton.textContent =
-        "🎤 Speak";
+          transcript +=
+            event.results[i][0]
+              .transcript;
 
-      statusBox.textContent =
-        "Voice command captured.";
+        }
 
-    };
+        commandBox.value =
+          transcript;
+
+      };
 
 
-    recognition.onerror = function(event) {
+    recognition.onend =
+      function() {
 
-      listening = false;
+        listening =
+          false;
 
-      voiceButton.classList.remove("listening");
+        voiceButton.classList.remove(
+          "listening"
+        );
 
-      voiceButton.textContent =
-        "🎤 Speak";
+        voiceButton.textContent =
+          "🎤 Speak";
 
-      statusBox.textContent =
-        "Voice error: " + event.error;
+        statusBox.textContent =
+          "Voice command captured.";
 
-    };
+      };
+
+
+    recognition.onerror =
+      function(event) {
+
+        listening =
+          false;
+
+        voiceButton.classList.remove(
+          "listening"
+        );
+
+        voiceButton.textContent =
+          "🎤 Speak";
+
+        statusBox.textContent =
+          "Voice error: " +
+          event.error;
+
+      };
 
   } else {
 
-    voiceButton.disabled = true;
+    voiceButton.disabled =
+      true;
 
     voiceButton.textContent =
       "🎤 Voice not supported";
-
-    statusBox.textContent =
-      "Your browser does not support voice recognition.";
 
   }
 
@@ -442,7 +906,8 @@ Create a motivational post about never giving up."
 
   function useExample(text) {
 
-    commandBox.value = text;
+    commandBox.value =
+      text;
 
     commandBox.focus();
 
