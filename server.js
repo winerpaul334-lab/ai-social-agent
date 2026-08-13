@@ -23,8 +23,10 @@ const ai = new GoogleGenAI({
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
+
+const IMAGE_BUCKET = "generated-images";
 
 // ==========================================
 // WEBSITE
@@ -42,7 +44,7 @@ async function saveMemory(memory) {
   const { error } = await supabase
     .from("agent_memory")
     .insert({
-      memory: memory
+      memory
     });
 
   if (error) {
@@ -78,15 +80,17 @@ async function savePost(
   command,
   post,
   hashtags,
-  imageIdea
+  imageIdea,
+  imageUrl
 ) {
   const { error } = await supabase
     .from("posts")
     .insert({
-      command: command,
-      post: post,
-      hashtags: hashtags,
-      image_idea: imageIdea
+      command,
+      post,
+      hashtags,
+      image_idea: imageIdea,
+      image_url: imageUrl
     });
 
   if (error) {
@@ -150,18 +154,12 @@ async function webSearch(query) {
 
         body: JSON.stringify({
           api_key: apiKey,
-          query: query,
-
+          query,
           search_depth: "advanced",
-
           topic: "news",
-
           max_results: 6,
-
           include_answer: true,
-
           include_raw_content: false,
-
           include_images: false
         })
       }
@@ -218,10 +216,8 @@ async function saveResearch(
   const { error } = await supabase
     .from("research")
     .insert({
-      query: query,
-      results: JSON.stringify(
-        results
-      )
+      query,
+      results: JSON.stringify(results)
     });
 
   if (error) {
@@ -265,19 +261,17 @@ function needsWebResearch(command) {
 }
 
 // ==========================================
-// CHECK WHETHER RESULT IS USEFUL
+// CLEAN SEARCH RESULTS
 // ==========================================
 
 function cleanSearchResults(results) {
   return results
-    .filter(item => {
-      return (
-        item &&
-        item.title &&
-        item.url &&
-        item.content
-      );
-    })
+    .filter(item =>
+      item &&
+      item.title &&
+      item.url &&
+      item.content
+    )
     .map(item => ({
       title: item.title,
       url: item.url,
@@ -331,6 +325,113 @@ ${sourceText}
 }
 
 // ==========================================
+// GENERATE REAL IMAGE
+// ==========================================
+
+async function generateImage(imagePrompt) {
+  console.log(
+    "Generating real image with Gemini..."
+  );
+
+  try {
+    const interaction =
+      await ai.interactions.create({
+        model: "gemini-3.1-flash-image",
+
+        input: imagePrompt,
+
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: "16:9",
+          image_size: "1K"
+        }
+      });
+
+    if (
+      !interaction ||
+      !interaction.output_image ||
+      !interaction.output_image.data
+    ) {
+      console.error(
+        "Gemini returned no image."
+      );
+
+      return {
+        success: false,
+        imageUrl: null
+      };
+    }
+
+    const imageBuffer =
+      Buffer.from(
+        interaction.output_image.data,
+        "base64"
+      );
+
+    const filename =
+      `social-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.png`;
+
+    console.log(
+      "Uploading image to Supabase..."
+    );
+
+    const { error: uploadError } =
+      await supabase.storage
+        .from(IMAGE_BUCKET)
+        .upload(
+          filename,
+          imageBuffer,
+          {
+            contentType: "image/png",
+            upsert: false,
+            cacheControl: "31536000"
+          }
+        );
+
+    if (uploadError) {
+      console.error(
+        "Image upload error:",
+        uploadError
+      );
+
+      return {
+        success: false,
+        imageUrl: null
+      };
+    }
+
+    const { data } =
+      supabase.storage
+        .from(IMAGE_BUCKET)
+        .getPublicUrl(filename);
+
+    console.log(
+      "Image generated successfully."
+    );
+
+    return {
+      success: true,
+      imageUrl: data.publicUrl,
+      filename
+    };
+
+  } catch (error) {
+    console.error(
+      "Image generation error:",
+      error
+    );
+
+    return {
+      success: false,
+      imageUrl: null
+    };
+  }
+}
+
+// ==========================================
 // COMMAND
 // ==========================================
 
@@ -355,7 +456,7 @@ app.post(
         command.toLowerCase();
 
       // ====================================
-      // REMEMBER COMMAND
+      // REMEMBER
       // ====================================
 
       const rememberWords = [
@@ -400,7 +501,7 @@ app.post(
           type: "memory",
           message:
             "Got it. I saved that to my memory.",
-          memory: memory
+          memory
         });
       }
 
@@ -425,11 +526,10 @@ app.post(
         await getMemories();
 
       if (isMemoryQuestion) {
-
         return res.json({
           success: true,
           type: "memory",
-          memories: memories
+          memories
         });
       }
 
@@ -498,12 +598,10 @@ app.post(
             );
 
           if (cleanResults.length) {
-
             await saveResearch(
               command,
               cleanResults
             );
-
           }
 
         } else {
@@ -512,13 +610,13 @@ app.post(
 Tavily research failed.
 
 Do not invent current information.
-Do not pretend that research was successful.
+Do not pretend research was successful.
 `;
         }
       }
 
       // ====================================
-      // GEMINI PROMPT
+      // GEMINI POST
       // ====================================
 
       const prompt = `
@@ -537,133 +635,38 @@ ${postHistoryText}
 WEB RESEARCH:
 ${researchText}
 
-========================================
-RESEARCH AND ACCURACY RULES
-========================================
+RULES:
 
-1. Web research is evidence.
+1. Use USER MEMORY when relevant.
+2. Never invent memories.
+3. Avoid repeating previous posts.
+4. Use web research for current claims.
+5. Never invent current news.
+6. Never invent numbers or dates.
+7. Never invent URLs.
+8. Prefer recent and reliable sources.
+9. Write naturally and professionally.
+10. Follow the user's command.
+11. Do not copy source articles.
 
-2. Do not automatically assume every search
-result is correct.
-
-3. Only make factual current-event claims
-that are supported by the supplied sources.
-
-4. Never invent facts.
-
-5. Never invent numbers.
-
-6. Never invent dates.
-
-7. Never invent people.
-
-8. Never invent companies.
-
-9. Never invent quotes.
-
-10. Never invent URLs.
-
-11. If a claim is not supported by the
-research, leave it out.
-
-12. If sources disagree, do not present an
-uncertain claim as certain.
-
-13. Prefer information supported by multiple
-independent sources.
-
-14. Prefer recent sources for current news.
-
-15. Do not confuse an article about one event
-with evidence for a different event.
-
-16. Before mentioning a major number, funding
-amount, acquisition, product launch, deal,
-investment or announcement, make sure the
-supplied source actually supports that claim.
-
-17. Do not combine unrelated facts from
-different articles and present them as one
-event.
-
-18. Do not use your general knowledge to fill
-missing information about current events.
-
-19. If the research is insufficient, clearly
-say that the information could not be
-verified instead of guessing.
-
-20. Rewrite information in original wording.
-Do not copy articles.
-
-========================================
-POST RULES
-========================================
-
-1. Follow the user's command exactly.
-
-2. Use USER MEMORY when relevant.
-
-3. Avoid repeating PREVIOUS POSTS.
-
-4. Make the content natural.
-
-5. Make the content professional.
-
-6. Make it engaging.
-
-7. Do not exaggerate facts.
-
-8. Do not use clickbait unless requested.
-
-9. Do not claim something happened "today"
-unless the research supports that timing.
-
-10. For news posts, focus on the most
-important verified story.
-
-========================================
-SOURCE RULES
-========================================
-
-If web research was used:
-
-- Include 2–3 strongest sources.
-- Use only URLs supplied by Tavily.
-- Never create a URL yourself.
-- Only include a source if it supports the
-information being discussed.
-- If fewer than 2 reliable sources support
-the story, use fewer sources rather than
-inventing additional ones.
-
-========================================
-OUTPUT FORMAT
-========================================
-
-When creating a social media post, return:
+When creating a post, return exactly:
 
 POST:
-[original post]
+[actual post]
 
 HASHTAGS:
 [relevant hashtags]
 
 IMAGE_IDEA:
-[suitable image idea]
+[detailed image description]
 
 SOURCES:
-[strong supporting URLs]
+[URLs only when web research was used]
 `;
-
-      // ====================================
-      // GEMINI
-      // ====================================
 
       const response =
         await ai.models.generateContent({
-          model:
-            "gemini-3.6-flash",
+          model: "gemini-3.6-flash",
           contents: prompt
         });
 
@@ -709,6 +712,43 @@ SOURCES:
       }
 
       // ====================================
+      // REAL IMAGE GENERATION
+      // ====================================
+
+      let imageUrl = null;
+
+      if (imageIdea) {
+
+        const fullImagePrompt = `
+Create a professional social-media image
+based on this description:
+
+${imageIdea}
+
+Style:
+- modern
+- clean
+- professional
+- high quality
+- suitable for X/Twitter
+- visually engaging
+- no unnecessary text
+- no watermark
+- 16:9 landscape composition
+`;
+
+        const generatedImage =
+          await generateImage(
+            fullImagePrompt
+          );
+
+        if (generatedImage.success) {
+          imageUrl =
+            generatedImage.imageUrl;
+        }
+      }
+
+      // ====================================
       // SAVE POST
       // ====================================
 
@@ -716,7 +756,8 @@ SOURCES:
         command,
         postText,
         hashtags,
-        imageIdea
+        imageIdea,
+        imageUrl
       );
 
       // ====================================
@@ -726,9 +767,21 @@ SOURCES:
       return res.json({
         success: true,
 
-        command: command,
+        command,
 
         response: result,
+
+        post: postText,
+
+        hashtags,
+
+        image_idea: imageIdea,
+
+        image_generated:
+          Boolean(imageUrl),
+
+        image_url:
+          imageUrl,
 
         memory_used:
           memories.length,
