@@ -1,82 +1,91 @@
 const express = require("express");
 const path = require("path");
-const { GoogleGenAI } = require("@google/genai");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// =====================================================
-// BASIC SETUP
-// =====================================================
-
-app.use(express.json({ limit: "10mb" }));
-app.use(express.static(path.join(__dirname)));
-
-// =====================================================
-// ENVIRONMENT
-// =====================================================
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_KEY;
+// ==========================================
+// CONFIG
+// ==========================================
 
 const POLLINATIONS_API_KEY =
   process.env.POLLINATIONS_API_KEY;
 
-const IMAGE_BUCKET = "generated-images";
+const SUPABASE_URL =
+  process.env.SUPABASE_URL;
 
-// =====================================================
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_KEY;
+
+const TAVILY_API_KEY =
+  process.env.TAVILY_API_KEY;
+
+const IMAGE_BUCKET =
+  process.env.IMAGE_BUCKET || "generated-images";
+
+// ==========================================
 // CHECK ENVIRONMENT
-// =====================================================
+// ==========================================
 
 console.log("======================================");
 console.log("AI SOCIAL AGENT STARTING");
 console.log("======================================");
-console.log(
-  "GEMINI_API_KEY:",
-  GEMINI_API_KEY ? "OK" : "MISSING"
-);
-console.log(
-  "SUPABASE_URL:",
-  SUPABASE_URL ? "OK" : "MISSING"
-);
-console.log(
-  "SUPABASE_KEY:",
-  SUPABASE_KEY ? "OK" : "MISSING"
-);
+
 console.log(
   "POLLINATIONS_API_KEY:",
   POLLINATIONS_API_KEY ? "OK" : "MISSING"
 );
+
+console.log(
+  "SUPABASE_URL:",
+  SUPABASE_URL ? "OK" : "MISSING"
+);
+
+console.log(
+  "SUPABASE_KEY:",
+  SUPABASE_KEY ? "OK" : "MISSING"
+);
+
+console.log(
+  "TAVILY_API_KEY:",
+  TAVILY_API_KEY ? "OK" : "MISSING"
+);
+
 console.log(
   "IMAGE_BUCKET:",
   IMAGE_BUCKET
 );
+
 console.log("======================================");
 
-// =====================================================
-// GEMINI
-// =====================================================
+// ==========================================
+// MIDDLEWARE
+// ==========================================
 
-const ai = new GoogleGenAI({
-  apiKey: GEMINI_API_KEY
-});
+app.use(express.json({ limit: "2mb" }));
 
-// =====================================================
-// SUPABASE
-// =====================================================
-
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
+app.use(
+  express.static(path.join(__dirname))
 );
 
-// =====================================================
-// WEBSITE
-// =====================================================
+// ==========================================
+// SUPABASE
+// ==========================================
+
+let supabase = null;
+
+if (SUPABASE_URL && SUPABASE_KEY) {
+  supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+}
+
+// ==========================================
+// HOME
+// ==========================================
 
 app.get("/", (req, res) => {
   res.sendFile(
@@ -84,42 +93,57 @@ app.get("/", (req, res) => {
   );
 });
 
-// =====================================================
+// ==========================================
 // HEALTH CHECK
-// =====================================================
+// ==========================================
 
 app.get("/health", (req, res) => {
   res.json({
     success: true,
     service: "AI Social Agent",
     status: "online",
-    image_provider: "Pollinations"
+    text_provider: "Pollinations",
+    image_provider: "Pollinations",
+    supabase: Boolean(supabase)
   });
 });
 
-// =====================================================
+// ==========================================
 // MEMORY
-// =====================================================
+// ==========================================
 
 async function saveMemory(memory) {
+
+  if (!supabase) {
+    console.error(
+      "Supabase is not configured."
+    );
+
+    return false;
+  }
+
   try {
-    const { error } = await supabase
-      .from("agent_memory")
-      .insert({
-        memory
-      });
+
+    const { error } =
+      await supabase
+        .from("agent_memory")
+        .insert({
+          memory
+        });
 
     if (error) {
       console.error(
         "Memory save error:",
         error
       );
+
       return false;
     }
 
     return true;
 
   } catch (error) {
+
     console.error(
       "Memory exception:",
       error
@@ -129,8 +153,18 @@ async function saveMemory(memory) {
   }
 }
 
+// ==========================================
+// GET MEMORIES
+// ==========================================
+
 async function getMemories() {
+
+  if (!supabase) {
+    return [];
+  }
+
   try {
+
     const { data, error } =
       await supabase
         .from("agent_memory")
@@ -146,6 +180,7 @@ async function getMemories() {
         .limit(20);
 
     if (error) {
+
       console.error(
         "Memory read error:",
         error
@@ -157,8 +192,9 @@ async function getMemories() {
     return data || [];
 
   } catch (error) {
+
     console.error(
-      "Memory exception:",
+      "Memory read exception:",
       error
     );
 
@@ -166,9 +202,9 @@ async function getMemories() {
   }
 }
 
-// =====================================================
-// POSTS
-// =====================================================
+// ==========================================
+// SAVE POST
+// ==========================================
 
 async function savePost(
   command,
@@ -176,6 +212,11 @@ async function savePost(
   hashtags,
   imageIdea
 ) {
+
+  if (!supabase) {
+    return;
+  }
+
   try {
 
     const { error } =
@@ -189,6 +230,7 @@ async function savePost(
         });
 
     if (error) {
+
       console.error(
         "Post save error:",
         error
@@ -201,11 +243,18 @@ async function savePost(
       "Post save exception:",
       error
     );
-
   }
 }
 
+// ==========================================
+// GET PREVIOUS POSTS
+// ==========================================
+
 async function getPreviousPosts() {
+
+  if (!supabase) {
+    return [];
+  }
 
   try {
 
@@ -246,19 +295,16 @@ async function getPreviousPosts() {
   }
 }
 
-// =====================================================
-// TAVILY WEB SEARCH
-// =====================================================
+// ==========================================
+// TAVILY SEARCH
+// ==========================================
 
 async function webSearch(query) {
 
-  const apiKey =
-    process.env.TAVILY_API_KEY;
+  if (!TAVILY_API_KEY) {
 
-  if (!apiKey) {
-
-    console.error(
-      "TAVILY_API_KEY is missing."
+    console.log(
+      "Tavily key not configured."
     );
 
     return {
@@ -282,14 +328,28 @@ async function webSearch(query) {
           },
 
           body: JSON.stringify({
-            api_key: apiKey,
+            api_key:
+              TAVILY_API_KEY,
+
             query,
-            search_depth: "advanced",
-            topic: "news",
-            max_results: 6,
-            include_answer: true,
-            include_raw_content: false,
-            include_images: false
+
+            search_depth:
+              "advanced",
+
+            topic:
+              "news",
+
+            max_results:
+              6,
+
+            include_answer:
+              true,
+
+            include_raw_content:
+              false,
+
+            include_images:
+              false
           })
         }
       );
@@ -338,54 +398,14 @@ async function webSearch(query) {
   }
 }
 
-// =====================================================
-// SAVE RESEARCH
-// =====================================================
-
-async function saveResearch(
-  query,
-  results
-) {
-
-  try {
-
-    const { error } =
-      await supabase
-        .from("research")
-        .insert({
-          query,
-          results:
-            JSON.stringify(results)
-        });
-
-    if (error) {
-
-      console.error(
-        "Research save error:",
-        error
-      );
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Research save exception:",
-      error
-    );
-
-  }
-}
-
-// =====================================================
+// ==========================================
 // RESEARCH DETECTION
-// =====================================================
+// ==========================================
 
-function needsWebResearch(
-  command
-) {
+function needsWebResearch(command) {
 
   const words = [
+
     "latest",
     "current",
     "today",
@@ -402,6 +422,7 @@ function needsWebResearch(
     "breaking",
     "update",
     "updates"
+
   ];
 
   const text =
@@ -413,15 +434,16 @@ function needsWebResearch(
   );
 }
 
-// =====================================================
-// CLEAN SEARCH RESULTS
-// =====================================================
+// ==========================================
+// CLEAN RESEARCH
+// ==========================================
 
 function cleanSearchResults(
   results
 ) {
 
-  return (results || [])
+  return results
+
     .filter(item => {
 
       return (
@@ -432,16 +454,70 @@ function cleanSearchResults(
       );
 
     })
+
     .map(item => ({
-      title: item.title,
-      url: item.url,
-      content: item.content
+
+      title:
+        item.title,
+
+      url:
+        item.url,
+
+      content:
+        item.content
+
     }));
 }
 
-// =====================================================
+// ==========================================
+// SAVE RESEARCH
+// ==========================================
+
+async function saveResearch(
+  query,
+  results
+) {
+
+  if (!supabase) {
+    return;
+  }
+
+  try {
+
+    const { error } =
+      await supabase
+        .from("research")
+        .insert({
+
+          query,
+
+          results:
+            JSON.stringify(
+              results
+            )
+
+        });
+
+    if (error) {
+
+      console.error(
+        "Research save error:",
+        error
+      );
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Research save exception:",
+      error
+    );
+  }
+}
+
+// ==========================================
 // BUILD RESEARCH TEXT
-// =====================================================
+// ==========================================
 
 function buildResearchText(
   answer,
@@ -461,6 +537,7 @@ Do not make current-event claims.
     results
       .map(
         (item, index) => `
+
 SOURCE ${index + 1}
 
 TITLE:
@@ -476,6 +553,7 @@ ${item.content}
       .join("\n");
 
   return `
+
 TAVILY SUMMARY:
 ${answer || "No summary returned."}
 
@@ -485,160 +563,177 @@ ${sourceText}
 `;
 }
 
-// =====================================================
-// GEMINI TEXT GENERATION
-// =====================================================
+// ==========================================
+// POLLINATIONS TEXT GENERATION
+// ==========================================
 
 async function generateText(
   prompt
 ) {
 
-  if (!GEMINI_API_KEY) {
+  if (!POLLINATIONS_API_KEY) {
 
     throw new Error(
-      "GEMINI_API_KEY is missing."
+      "POLLINATIONS_API_KEY is missing."
     );
   }
+
+  console.log(
+    "🧠 Generating text with Pollinations..."
+  );
+
+  const response =
+    await fetch(
+      "https://gen.pollinations.ai/v1/chat/completions",
+      {
+        method: "POST",
+
+        headers: {
+
+          "Authorization":
+            `Bearer ${POLLINATIONS_API_KEY}`,
+
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+
+          model: "openai",
+
+          messages: [
+
+            {
+              role: "system",
+
+              content:
+                "You are a professional social media content AI."
+            },
+
+            {
+              role: "user",
+
+              content: prompt
+            }
+
+          ],
+
+          temperature: 0.8
+        })
+      }
+    );
+
+  const raw =
+    await response.text();
+
+  if (!response.ok) {
+
+    console.error(
+      "Pollinations text error:",
+      raw
+    );
+
+    throw new Error(
+      `Pollinations text request failed: ${response.status}`
+    );
+  }
+
+  let data;
 
   try {
 
-    console.log(
-      "🧠 Sending text request to Gemini..."
-    );
+    data =
+      JSON.parse(raw);
 
-    const response =
-      await ai.models.generateContent({
-        model:
-          "gemini-3.6-flash",
-
-        contents: prompt
-      });
-
-    const text =
-      response.text || "";
-
-    if (!text.trim()) {
-
-      throw new Error(
-        "Gemini returned an empty response."
-      );
-    }
-
-    return text;
-
-  } catch (error) {
+  } catch {
 
     console.error(
-      "Gemini text error:",
-      error
+      "Invalid Pollinations response:",
+      raw
     );
 
-    throw error;
+    throw new Error(
+      "Pollinations returned invalid JSON."
+    );
   }
+
+  const text =
+    data?.choices?.[0]
+      ?.message?.content;
+
+  if (!text) {
+
+    console.error(
+      "Pollinations returned no text:",
+      data
+    );
+
+    throw new Error(
+      "Pollinations returned no text."
+    );
+  }
+
+  return text;
 }
 
-// =====================================================
-// REAL IMAGE GENERATION - POLLINATIONS
-// =====================================================
+// ==========================================
+// POLLINATIONS IMAGE GENERATION
+// ==========================================
 
 async function generateImage(
   imageIdea
 ) {
 
-  console.log(
-    "======================================"
-  );
+  if (!POLLINATIONS_API_KEY) {
+
+    console.error(
+      "POLLINATIONS_API_KEY is missing."
+    );
+
+    return null;
+  }
 
   console.log(
     "🎨 Starting REAL image generation..."
   );
 
-  console.log(
-    "🖼️ Provider: Pollinations"
-  );
-
-  console.log(
-    "======================================"
-  );
-
-  if (!POLLINATIONS_API_KEY) {
-
-    console.error(
-      "❌ POLLINATIONS_API_KEY is missing."
-    );
-
-    return null;
-  }
-
-  if (!imageIdea) {
-
-    console.error(
-      "❌ No image idea was supplied."
-    );
-
-    return null;
-  }
-
   try {
 
-    // -------------------------------------------------
-    // PROFESSIONAL IMAGE PROMPT
-    // -------------------------------------------------
-
     const prompt = `
-Create a professional photorealistic image
-for a social media business/technology post.
 
-IMAGE CONCEPT:
+Professional high-end editorial photograph.
+
 ${imageIdea}
 
-IMPORTANT REQUIREMENTS:
+Requirements:
 
-- Photorealistic
-- Professional editorial photography
-- Modern corporate aesthetic
-- High visual quality
-- Strong composition
-- Natural realistic lighting
-- Cinematic depth
-- No watermark
-- No logos
-- No text overlay
-- No captions
-- No distorted objects
-- No cartoon style
-- No illustration style
-- Suitable for an X/Twitter professional post
-- Landscape 16:9 composition
+Photorealistic.
+Professional.
+Modern.
+Clean composition.
+High visual quality.
+Natural realistic lighting.
+No watermark.
+No unnecessary text.
+No logos.
+Suitable for a professional X/Twitter post.
+Landscape composition.
 `;
-
-    // -------------------------------------------------
-    // ENCODE PROMPT
-    // -------------------------------------------------
 
     const encodedPrompt =
       encodeURIComponent(
-        prompt.trim()
+        prompt
       );
-
-    // -------------------------------------------------
-    // POLLINATIONS IMAGE URL
-    // -------------------------------------------------
 
     const imageUrl =
       `https://gen.pollinations.ai/image/${encodedPrompt}` +
       `?model=flux` +
       `&width=1536` +
-      `&height=864` +
-      `&nologo=true`;
+      `&height=864`;
 
     console.log(
-      "🧠 Sending image request to Pollinations..."
+      "🖼️ Sending image request to Pollinations..."
     );
-
-    // -------------------------------------------------
-    // REQUEST IMAGE
-    // -------------------------------------------------
 
     const response =
       await fetch(
@@ -647,8 +742,12 @@ IMPORTANT REQUIREMENTS:
           method: "GET",
 
           headers: {
-            Authorization:
-              `Bearer ${POLLINATIONS_API_KEY}`
+
+            "Authorization":
+              `Bearer ${POLLINATIONS_API_KEY}`,
+
+            "Accept":
+              "image/jpeg,image/png"
           }
         }
       );
@@ -667,91 +766,125 @@ IMPORTANT REQUIREMENTS:
       return null;
     }
 
-    // -------------------------------------------------
-    // GET IMAGE BYTES
-    // -------------------------------------------------
+    const contentType =
+      response.headers
+        .get("content-type") ||
+      "image/jpeg";
+
+    if (
+      !contentType.startsWith(
+        "image/"
+      )
+    ) {
+
+      const text =
+        await response.text();
+
+      console.error(
+        "❌ Pollinations did not return an image:",
+        text
+      );
+
+      return null;
+    }
+
+    const arrayBuffer =
+      await response.arrayBuffer();
 
     const imageBuffer =
       Buffer.from(
-        await response.arrayBuffer()
+        arrayBuffer
       );
 
-    if (!imageBuffer.length) {
+    if (
+      !imageBuffer.length
+    ) {
 
       console.error(
-        "❌ Pollinations returned an empty image."
+        "❌ Empty image received."
       );
 
       return null;
     }
 
     console.log(
-      "✅ Pollinations returned image:",
-      imageBuffer.length,
-      "bytes"
+      `📦 Image received: ${imageBuffer.length} bytes`
     );
 
-    // -------------------------------------------------
-    // FILE NAME
-    // -------------------------------------------------
+    // ======================================
+    // SUPABASE STORAGE
+    // ======================================
+
+    if (!supabase) {
+
+      console.error(
+        "❌ Supabase is not configured."
+      );
+
+      return null;
+    }
+
+    let extension =
+      "jpg";
+
+    if (
+      contentType.includes(
+        "png"
+      )
+    ) {
+
+      extension =
+        "png";
+    }
 
     const fileName =
-      `ai-social-${Date.now()}.jpg`;
-
-    // -------------------------------------------------
-    // UPLOAD TO SUPABASE
-    // -------------------------------------------------
+      `ai-social-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}.${extension}`;
 
     console.log(
       "☁️ Uploading image to Supabase..."
     );
 
-    const { error:
-      uploadError
-    } =
+    const { error } =
       await supabase.storage
-        .from(IMAGE_BUCKET)
+        .from(
+          IMAGE_BUCKET
+        )
         .upload(
           fileName,
           imageBuffer,
           {
-            contentType:
-              "image/jpeg",
-
+            contentType,
             cacheControl:
               "31536000",
-
             upsert: false
           }
         );
 
-    if (uploadError) {
+    if (error) {
 
       console.error(
         "❌ Supabase image upload error:",
-        uploadError
+        error
       );
 
       return null;
     }
 
-    // -------------------------------------------------
-    // PUBLIC URL
-    // -------------------------------------------------
-
-    const { data:
-      publicData
-    } =
+    const { data } =
       supabase.storage
-        .from(IMAGE_BUCKET)
+        .from(
+          IMAGE_BUCKET
+        )
         .getPublicUrl(
           fileName
         );
 
-    const publicUrl =
-      publicData?.publicUrl;
-
-    if (!publicUrl) {
+    if (
+      !data ||
+      !data.publicUrl
+    ) {
 
       console.error(
         "❌ Could not create public image URL."
@@ -761,22 +894,14 @@ IMPORTANT REQUIREMENTS:
     }
 
     console.log(
-      "======================================"
+      "✅ REAL IMAGE GENERATED:"
     );
 
     console.log(
-      "✅ REAL IMAGE GENERATED"
+      data.publicUrl
     );
 
-    console.log(
-      publicUrl
-    );
-
-    console.log(
-      "======================================"
-    );
-
-    return publicUrl;
+    return data.publicUrl;
 
   } catch (error) {
 
@@ -792,9 +917,69 @@ IMPORTANT REQUIREMENTS:
   }
 }
 
-// =====================================================
+// ==========================================
+// EXTRACT AI RESPONSE
+// ==========================================
+
+function extractPostData(
+  result
+) {
+
+  let post =
+    result;
+
+  let hashtags =
+    "";
+
+  let imageIdea =
+    "";
+
+  const postMatch =
+    result.match(
+      /POST:\s*([\s\S]*?)(?=\nHASHTAGS:|$)/i
+    );
+
+  const hashtagMatch =
+    result.match(
+      /HASHTAGS:\s*([\s\S]*?)(?=\nIMAGE_IDEA:|$)/i
+    );
+
+  const imageMatch =
+    result.match(
+      /IMAGE_IDEA:\s*([\s\S]*?)(?=\nSOURCES:|$)/i
+    );
+
+  if (postMatch) {
+
+    post =
+      postMatch[1]
+        .trim();
+  }
+
+  if (hashtagMatch) {
+
+    hashtags =
+      hashtagMatch[1]
+        .trim();
+  }
+
+  if (imageMatch) {
+
+    imageIdea =
+      imageMatch[1]
+        .trim();
+  }
+
+  return {
+    post,
+    hashtags,
+    imageIdea
+  };
+}
+
+// ==========================================
 // COMMAND
-// =====================================================
+// ==========================================
 
 app.post(
   "/command",
@@ -806,11 +991,16 @@ app.post(
 
     if (!command) {
 
-      return res.status(400).json({
-        success: false,
-        error:
-          "Please provide a command."
-      });
+      return res
+        .status(400)
+        .json({
+
+          success: false,
+
+          error:
+            "Please provide a command."
+
+        });
     }
 
     try {
@@ -818,17 +1008,19 @@ app.post(
       const lowerCommand =
         command.toLowerCase();
 
-      // ===============================================
+      // ====================================
       // REMEMBER COMMAND
-      // ===============================================
+      // ====================================
 
       const rememberWords = [
+
         "remember that",
         "remember this",
         "remember:"
+
       ];
 
-      const isRememberCommand =
+      const isRemember =
         rememberWords.some(
           word =>
             lowerCommand.includes(
@@ -836,7 +1028,7 @@ app.post(
             )
         );
 
-      if (isRememberCommand) {
+      if (isRemember) {
 
         let memory =
           command;
@@ -847,15 +1039,14 @@ app.post(
         ) {
 
           memory =
-            memory
-              .replace(
-                new RegExp(
-                  word,
-                  "i"
-                ),
-                ""
-              )
-              .trim();
+            memory.replace(
+              new RegExp(
+                word,
+                "i"
+              ),
+              ""
+            )
+            .trim();
         }
 
         const saved =
@@ -865,90 +1056,113 @@ app.post(
 
         if (!saved) {
 
-          return res.status(500).json({
-            success: false,
-            error:
-              "I could not save that memory."
-          });
+          return res
+            .status(500)
+            .json({
+
+              success: false,
+
+              error:
+                "I could not save that memory."
+
+            });
         }
 
         return res.json({
+
           success: true,
-          type: "memory",
+
+          type:
+            "memory",
+
           message:
             "Got it. I saved that to my memory.",
+
           memory
+
         });
       }
 
-      // ===============================================
-      // GET MEMORIES
-      // ===============================================
+      // ====================================
+      // MEMORY QUESTION
+      // ====================================
 
-      const memories =
-        await getMemories();
+      const memoryQuestions = [
 
-      const memoryWords = [
         "what do you remember",
         "what you remember",
         "show my memories",
         "my memories",
         "what have you remembered",
-        "what do you know about me"
+        "what do you remember about me"
+
       ];
 
       const isMemoryQuestion =
-        memoryWords.some(
+        memoryQuestions.some(
           word =>
             lowerCommand.includes(
               word
             )
         );
 
+      const memories =
+        await getMemories();
+
       if (isMemoryQuestion) {
 
         return res.json({
+
           success: true,
-          type: "memory",
+
+          type:
+            "memory",
+
           memories
+
         });
       }
 
-      // ===============================================
+      // ====================================
       // PREVIOUS POSTS
-      // ===============================================
+      // ====================================
 
       const previousPosts =
         await getPreviousPosts();
 
       const memoryText =
         memories.length
+
           ? memories
               .map(
                 (item, index) =>
                   `${index + 1}. ${item.memory}`
               )
               .join("\n")
+
           : "No saved memories yet.";
 
       const postHistoryText =
         previousPosts.length
+
           ? previousPosts
               .map(
                 (item, index) =>
                   `${index + 1}. ${item.post}`
               )
               .join("\n\n")
+
           : "No previous posts yet.";
 
-      // ===============================================
+      // ====================================
       // WEB RESEARCH
-      // ===============================================
+      // ====================================
 
       let researchText =
         "No web research was requested.";
 
-      let researchSources = [];
+      let researchSources =
+        [];
 
       const shouldSearch =
         needsWebResearch(
@@ -995,6 +1209,7 @@ app.post(
         } else {
 
           researchText = `
+
 Tavily research failed.
 
 Do not invent current information.
@@ -1003,11 +1218,12 @@ Do not pretend research was successful.
         }
       }
 
-      // ===============================================
-      // GEMINI PROMPT
-      // ===============================================
+      // ====================================
+      // AI PROMPT
+      // ====================================
 
       const prompt = `
+
 You are the AI brain of a professional
 production-oriented social media agent.
 
@@ -1025,28 +1241,53 @@ ${researchText}
 
 IMPORTANT RULES:
 
-1. Use USER MEMORY when relevant.
-2. Never invent memories.
-3. Avoid repeating previous posts.
-4. Use web research for current claims.
-5. Never invent current news.
-6. Never invent numbers.
-7. Never invent dates.
-8. Never invent URLs.
-9. Prefer recent reliable sources.
-10. Write naturally.
-11. Keep content professional.
-12. Make the content engaging.
-13. Follow the user's command exactly.
-14. Create a useful detailed IMAGE_IDEA
-    for every social media post.
-15. The IMAGE_IDEA must describe a
-    realistic professional image.
-16. Do not put the actual image inside
-    the text response.
+1. Follow the user's command exactly.
 
-When creating a social media post,
-return exactly:
+2. Use relevant user memory.
+
+3. Never invent memories.
+
+4. Avoid repeating previous posts.
+
+5. If web research is supplied,
+use it for current claims.
+
+6. Never invent current news.
+
+7. Never invent statistics.
+
+8. Never invent dates.
+
+9. Never invent URLs.
+
+10. Write naturally.
+
+11. Keep the content professional.
+
+12. Make the post engaging.
+
+13. Avoid unnecessary emojis.
+
+14. Do not make every post sound identical.
+
+15. Vary the opening sentence.
+
+16. Vary the structure.
+
+17. Do not repeatedly use phrases such as
+"the future is", "in today's world",
+or "this is more than".
+
+18. For a social media post,
+always create a strong IMAGE_IDEA.
+
+19. The image idea must describe a
+realistic professional photograph or
+visual suitable for the subject.
+
+20. Do not put the image itself in the response.
+
+RETURN EXACTLY THIS FORMAT:
 
 POST:
 [actual post]
@@ -1055,81 +1296,37 @@ HASHTAGS:
 [relevant hashtags]
 
 IMAGE_IDEA:
-[detailed visual description]
+[detailed image description]
 
 SOURCES:
-[URLs if web research was used]
+[URLs if web research was used, otherwise N/A]
 `;
 
-      console.log(
-        "🧠 Generating post..."
-      );
+      // ====================================
+      // GENERATE POST WITH POLLINATIONS
+      // ====================================
 
       const result =
         await generateText(
           prompt
         );
 
-      // ===============================================
-      // EXTRACT RESULT
-      // ===============================================
+      // ====================================
+      // EXTRACT
+      // ====================================
 
-      let postText =
-        result;
-
-      let hashtags = "";
-
-      let imageIdea = "";
-
-      let sources = "";
-
-      const postMatch =
-        result.match(
-          /POST:\s*([\s\S]*?)(?=\nHASHTAGS:|$)/i
+      const {
+        post,
+        hashtags,
+        imageIdea
+      } =
+        extractPostData(
+          result
         );
 
-      const hashtagMatch =
-        result.match(
-          /HASHTAGS:\s*([\s\S]*?)(?=\nIMAGE_IDEA:|$)/i
-        );
-
-      const imageMatch =
-        result.match(
-          /IMAGE_IDEA:\s*([\s\S]*?)(?=\nSOURCES:|$)/i
-        );
-
-      const sourceMatch =
-        result.match(
-          /SOURCES:\s*([\s\S]*)$/i
-        );
-
-      if (postMatch) {
-
-        postText =
-          postMatch[1].trim();
-      }
-
-      if (hashtagMatch) {
-
-        hashtags =
-          hashtagMatch[1].trim();
-      }
-
-      if (imageMatch) {
-
-        imageIdea =
-          imageMatch[1].trim();
-      }
-
-      if (sourceMatch) {
-
-        sources =
-          sourceMatch[1].trim();
-      }
-
-      // ===============================================
-      // IMAGE
-      // ===============================================
+      // ====================================
+      // GENERATE REAL IMAGE
+      // ====================================
 
       let imageUrl =
         null;
@@ -1140,28 +1337,22 @@ SOURCES:
           await generateImage(
             imageIdea
           );
-
-      } else {
-
-        console.error(
-          "❌ No IMAGE_IDEA was generated."
-        );
       }
 
-      // ===============================================
+      // ====================================
       // SAVE POST
-      // ===============================================
+      // ====================================
 
       await savePost(
         command,
-        postText,
+        post,
         hashtags,
         imageIdea
       );
 
-      // ===============================================
-      // RESPONSE
-      // ===============================================
+      // ====================================
+      // RETURN
+      // ====================================
 
       return res.json({
 
@@ -1172,8 +1363,7 @@ SOURCES:
         response:
           result,
 
-        post:
-          postText,
+        post,
 
         hashtags,
 
@@ -1187,8 +1377,6 @@ SOURCES:
 
         image_url:
           imageUrl,
-
-        sources,
 
         memory_used:
           memories.length,
@@ -1214,22 +1402,24 @@ SOURCES:
         error
       );
 
-      return res.status(500).json({
+      return res
+        .status(500)
+        .json({
 
-        success: false,
+          success: false,
 
-        error:
-          error.message ||
-          "AI could not process the command."
+          error:
+            error.message ||
+            "AI could not process the command."
 
-      });
+        });
     }
   }
 );
 
-// =====================================================
+// ==========================================
 // START SERVER
-// =====================================================
+// ==========================================
 
 app.listen(
   PORT,
@@ -1241,4 +1431,3 @@ app.listen(
 
   }
 );
-        
